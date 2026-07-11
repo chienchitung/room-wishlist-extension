@@ -13,7 +13,8 @@
 (function (global) {
   "use strict";
 
-  const storage = global.__ikeaStorage;
+  const storage = global.__roomlistStorage;
+  const adapter = global.__roomlistAdapter;
 
   const PANEL_CSS = `
     /* all:initial 理論上已經把 font-size 重設成瀏覽器預設的 16px（跟被裝進哪個網站無關），
@@ -23,18 +24,18 @@
     :host { all: initial; font-size:16px !important; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
     .root {
       /* 以下數值取自 ikea.com.tw 的 buttons.css / prices.css / main-legacy.css */
-      --ikea-blue:#0058A3; --ikea-blue-hover:#004F93; --ikea-blue-press:#003E72; --ikea-yellow:#FFDB00;
+      --brand-primary:#45624E; --brand-primary-hover:#354D3D; --brand-primary-press:#25382C; --brand-accent:#D9A56D;
       --ink:#111111; --ink-secondary:#484848; --ink-disabled:#929292; --border-disabled:#DFDFDF;
       --surface:#FFFFFF; --surface-hover:#F5F5F5; --offer-red:#CC0008; --success:#0A8A00;
       --pill:999px; --radius-md:8px;
       --shadow-pop:0 8px 24px rgba(17,17,17,.16); --shadow-drawer:-6px 0 28px rgba(17,17,17,.16);
       --ease:cubic-bezier(.4,0,.2,1);
-      font-family:"Noto IKEA Latin","Noto Sans","Noto Sans TC","Roboto","Open Sans",system-ui,sans-serif;
+      font-family:"Avenir Next","PingFang TC","Noto Sans TC",system-ui,sans-serif;
       font-variant-numeric: tabular-nums; color:var(--ink);
     }
     @media (prefers-color-scheme: dark) {
       .root { --surface:#1E1E1E; --surface-hover:#292929; --border-disabled:#3A3A3A; --ink:#F2F2F2; --ink-secondary:#B8B8B8; --ink-disabled:#7A7A7A;
-        --ikea-blue:#4C9AE8; --ikea-blue-hover:#6BAEEF; --ikea-blue-press:#3D82CC;
+        --brand-primary:#8DB49A; --brand-primary-hover:#A4C3AE; --brand-primary-press:#6F9A7E;
         --shadow-pop:0 8px 24px rgba(0,0,0,.5); --shadow-drawer:-6px 0 32px rgba(0,0,0,.55); }
     }
     * { box-sizing:border-box; }
@@ -42,14 +43,14 @@
 
     .tab {
       position:fixed; right:0; top:50%; transform:translateY(-50%); z-index:2147483000;
-      background:var(--ikea-blue); color:#fff; border:none; cursor:pointer; padding:16px 11px;
+      background:var(--brand-primary); color:#fff; border:none; cursor:pointer; padding:16px 11px;
       border-radius:12px 0 0 12px; display:flex; flex-direction:column; align-items:center;
       gap:10px; box-shadow:var(--shadow-pop); writing-mode:vertical-rl; font-size:13px; font-weight:700; letter-spacing:1px;
       transition:right .3s var(--ease), background .15s;
     }
-    .tab:hover { background:var(--ikea-blue-hover); }
+    .tab:hover { background:var(--brand-primary-hover); }
     .tab .badge {
-      writing-mode:horizontal-tb; background:var(--ikea-yellow); color:var(--ikea-blue-press); font-weight:800;
+      writing-mode:horizontal-tb; background:var(--brand-accent); color:var(--brand-primary-press); font-weight:800;
       font-size:12px; border-radius:var(--pill); width:24px; height:24px; display:flex; align-items:center; justify-content:center;
     }
     .tab.open { right:min(430px,92vw); }
@@ -57,11 +58,11 @@
     /* IKEA Planner（設計組合頁）沒有原生按鈕可以攔截，補一顆我們自己的浮動按鈕 */
     .planner-quick-add {
       all:unset; position:fixed; right:16px; bottom:24px; z-index:2147483000;
-      display:flex; align-items:center; gap:8px; background:var(--ikea-blue); color:#fff;
+      display:flex; align-items:center; gap:8px; background:var(--brand-primary); color:#fff;
       border-radius:var(--pill); padding:13px 18px; cursor:pointer; font-size:13px; font-weight:700;
       box-shadow:var(--shadow-pop); transition:background .15s, transform .15s;
     }
-    .planner-quick-add:hover { background:var(--ikea-blue-hover); transform:translateY(-1px); }
+    .planner-quick-add:hover { background:var(--brand-primary-hover); transform:translateY(-1px); }
     .planner-quick-add:active { transform:scale(.97); }
     .planner-quick-add svg { width:18px; height:18px; flex:none; }
     /* 沒有這條的話，上面明寫的 display:flex 會蓋掉瀏覽器對 [hidden] 屬性的預設 display:none
@@ -97,11 +98,11 @@
     .room-chips { display:flex; gap:8px; padding:14px 20px; overflow-x:auto; border-bottom:1px solid var(--border-disabled); }
     .chip { all:unset; flex:0 0 auto; font-size:13px; font-weight:600; padding:8px 14px; border-radius:var(--pill); box-shadow:inset 0 0 0 1px var(--border-disabled); color:var(--ink-secondary); cursor:pointer; white-space:nowrap; }
     .chip.zero { opacity:.5; }
-    .chip.active { background:var(--ikea-blue); box-shadow:none; color:#fff; }
+    .chip.active { background:var(--brand-primary); box-shadow:none; color:#fff; }
 
     .list-toolbar { display:flex; align-items:center; justify-content:space-between; padding:10px 20px; border-bottom:1px solid var(--border-disabled); }
     .select-all { display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--ink-secondary); cursor:pointer; user-select:none; }
-    .select-all input { width:16px; height:16px; accent-color:var(--ikea-blue); cursor:pointer; margin:0; }
+    .select-all input { width:16px; height:16px; accent-color:var(--brand-primary); cursor:pointer; margin:0; }
     .bulk-delete-btn { all:unset; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:700; color:var(--offer-red); cursor:pointer; padding:5px 9px; border-radius:6px; }
     .bulk-delete-btn:hover { background:var(--surface-hover); }
     .bulk-delete-btn svg { width:14px; height:14px; }
@@ -110,9 +111,9 @@
     .item-list { flex:1; overflow-y:auto; padding:4px 20px; }
     .item-row { display:grid; grid-template-columns:auto 1fr auto; align-items:start; gap:12px; padding:16px 0; border-bottom:1px solid var(--border-disabled); }
     .item-row:last-child { border-bottom:none; }
-    .item-checkbox { width:16px; height:16px; margin-top:3px; accent-color:var(--ikea-blue); cursor:pointer; }
+    .item-checkbox { width:16px; height:16px; margin-top:3px; accent-color:var(--brand-primary); cursor:pointer; }
     .item-name { display:block; font-size:13.5px; font-weight:600; line-height:1.3; color:var(--ink); text-decoration:none; }
-    .item-name:hover { text-decoration:underline; color:var(--ikea-blue); }
+    .item-name:hover { text-decoration:underline; color:var(--brand-primary); }
     .item-meta { font-size:11.5px; color:var(--ink-secondary); margin-top:3px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
     .room-tag { font-size:11px; font-weight:600; background:var(--surface-hover); border-radius:var(--pill); padding:3px 9px; color:var(--ink); cursor:pointer; }
     .qty-row { display:inline-flex; align-items:center; border-radius:var(--pill); box-shadow:0 0 0 1px var(--border-disabled); margin-top:9px; }
@@ -122,7 +123,7 @@
     .item-right { text-align:right; display:flex; flex-direction:column; align-items:flex-end; justify-content:space-between; }
     .item-price { all:unset; font-size:13px; font-weight:700; cursor:pointer; border-radius:6px; padding:2px 5px; margin:-2px -5px; }
     .item-price:hover { background:var(--surface-hover); }
-    .item-price-input { width:78px; font-size:13px; font-weight:700; text-align:right; border:1px solid var(--ikea-blue); border-radius:6px; padding:3px 6px; font-family:inherit; color:var(--ink); background:var(--surface); }
+    .item-price-input { width:78px; font-size:13px; font-weight:700; text-align:right; border:1px solid var(--brand-primary); border-radius:6px; padding:3px 6px; font-family:inherit; color:var(--ink); background:var(--surface); }
     .remove-btn { all:unset; color:var(--ink-secondary); cursor:pointer; padding:4px; border-radius:var(--pill); }
     .remove-btn:hover { color:var(--offer-red); background:var(--surface-hover); }
     .remove-btn svg { width:15px; height:15px; display:block; }
@@ -138,9 +139,9 @@
     .btn { all:unset; box-sizing:border-box; display:flex; align-items:center; justify-content:center; gap:8px; height:55px; padding:0 24px; border-radius:var(--pill); font-size:14px; font-weight:700; cursor:pointer; transition:transform .2s var(--ease), background .15s, box-shadow .15s; }
     .btn:active { transform:scale(.97); }
     .btn svg { width:20px; height:20px; flex:none; }
-    .btn-primary { background:var(--ikea-blue); color:#fff; width:100%; margin-bottom:8px; }
-    .btn-primary:hover { background:var(--ikea-blue-hover); }
-    .btn-primary:active { background:var(--ikea-blue-press); }
+    .btn-primary { background:var(--brand-primary); color:#fff; width:100%; margin-bottom:8px; }
+    .btn-primary:hover { background:var(--brand-primary-hover); }
+    .btn-primary:active { background:var(--brand-primary-press); }
     .btn-outline { height:44px; font-size:13px; background:var(--surface); color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink-secondary); }
     .btn-outline svg { width:18px; height:18px; }
     .btn-outline:hover { box-shadow:inset 0 0 0 1px var(--ink); }
@@ -161,13 +162,13 @@
     .field label { display:block; font-size:12px; color:var(--ink-secondary); margin-bottom:4px; }
     .field input { all:unset; box-sizing:border-box; width:100%; border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border-disabled); padding:9px 10px; font-size:13px; color:var(--ink); background:var(--surface); }
     .field select { all:unset; box-sizing:border-box; width:100%; border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border-disabled); padding:9px 10px; font-size:13px; color:var(--ink); background:var(--surface); cursor:pointer; }
-    .field input:focus { box-shadow:inset 0 0 0 2px var(--ikea-blue); }
+    .field input:focus { box-shadow:inset 0 0 0 2px var(--brand-primary); }
     .field textarea { all:unset; box-sizing:border-box; display:block; width:100%; min-height:90px; border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border-disabled); padding:9px 10px; font-size:12px; font-family:monospace; color:var(--ink); background:var(--surface); resize:vertical; line-height:1.5; word-break:break-all; }
-    .field textarea:focus { box-shadow:inset 0 0 0 2px var(--ikea-blue); }
+    .field textarea:focus { box-shadow:inset 0 0 0 2px var(--brand-primary); }
     .restore-list { max-height:280px; overflow-y:auto; margin:10px 0 4px; border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border-disabled); }
     .restore-row { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-bottom:1px solid var(--border-disabled); cursor:pointer; }
     .restore-row:last-child { border-bottom:none; }
-    .restore-row input[type="checkbox"] { width:16px; height:16px; margin-top:2px; accent-color:var(--ikea-blue); cursor:pointer; flex:none; }
+    .restore-row input[type="checkbox"] { width:16px; height:16px; margin-top:2px; accent-color:var(--brand-primary); cursor:pointer; flex:none; }
     .restore-row-name { font-size:12.5px; font-weight:600; line-height:1.4; }
     .restore-row-meta { font-size:11px; color:var(--ink-secondary); margin-top:2px; }
     .field-row { display:flex; gap:6px; }
@@ -179,12 +180,12 @@
     .switch input { position:absolute; opacity:0; width:1px; height:1px; }
     .switch-slider { position:absolute; inset:0; background:var(--border-disabled); border-radius:var(--pill); cursor:pointer; transition:background .15s; }
     .switch-slider::before { content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:transform .15s; box-shadow:0 1px 2px rgba(0,0,0,.25); }
-    .switch input:checked + .switch-slider { background:var(--ikea-blue); }
+    .switch input:checked + .switch-slider { background:var(--brand-primary); }
     .switch input:checked + .switch-slider::before { transform:translateX(18px); }
-    .switch input:focus-visible + .switch-slider { outline:2px solid var(--ikea-blue); outline-offset:2px; }
+    .switch input:focus-visible + .switch-slider { outline:2px solid var(--brand-primary); outline-offset:2px; }
     .room-manage-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
     .room-manage-head label { margin:0; }
-    .restore-link { all:unset; display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; color:var(--ikea-blue); cursor:pointer; }
+    .restore-link { all:unset; display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; color:var(--brand-primary); cursor:pointer; }
     .restore-link:hover { text-decoration:underline; }
     .restore-link svg { width:13px; height:13px; }
     .room-manage { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
@@ -197,7 +198,7 @@
     .toast-region { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:2147483004; display:flex; flex-direction:column; gap:8px; align-items:center; }
     .toast { background:var(--ink); color:var(--surface); font-size:13px; font-weight:600; padding:11px 18px; border-radius:var(--pill); box-shadow:var(--shadow-pop); opacity:0; transform:translateY(8px); transition:opacity .2s, transform .2s; max-width:320px; text-align:center; }
     .toast.show { opacity:1; transform:translateY(0); }
-    button:focus-visible { outline:2px solid var(--ikea-blue); outline-offset:2px; }
+    button:focus-visible { outline:2px solid var(--brand-primary); outline-offset:2px; }
   `;
 
   const ICONS = {
@@ -262,9 +263,9 @@
   let plannerEditingItemId = null;
 
   function mountPanel() {
-    if (document.getElementById("__ikea_wishlist_host__")) return;
+    if (document.getElementById("__roomlist_wishlist_host__")) return;
     const host = document.createElement("div");
-    host.id = "__ikea_wishlist_host__";
+    host.id = "__roomlist_wishlist_host__";
     document.documentElement.appendChild(host);
     shadow = host.attachShadow({ mode: "open" });
 
@@ -280,7 +281,7 @@
       <aside class="drawer" id="drawer" aria-label="採購清單面板">
         <div class="drawer-head">
           <div>
-            <h2>我的採購清單</h2>
+            <h2 id="drawerTitle">我的採購清單</h2>
             <p id="headSubtitle">尚未加入商品</p>
           </div>
           <div class="head-actions">
@@ -299,7 +300,7 @@
           <div class="total-caption">實際金額以官網結帳頁顯示為準，可能因活動或門市庫存調整</div>
           <button class="btn btn-primary" id="btnPdf">${ICONS.pdf}匯出 PDF</button>
           <button class="btn btn-outline" id="btnEmail" style="width:100%">${ICONS.mail}Email 寄送清單內容</button>
-          <p class="disclaimer">本工具由第三方獨立開發，非 IKEA 官方服務。</p>
+          <p class="disclaimer">RoomList 為獨立工具，與頁面所示電商品牌無隸屬或授權關係。</p>
         </div>
       </aside>
       <div class="modal-scrim" id="settingsScrim">
@@ -316,6 +317,7 @@
             </label>
           </div>
           <p>設定寄送信箱，或新增/移除採購空間分類。</p>
+          <div class="field"><label>清單名稱</label><input type="text" id="settingsListName" placeholder="我的採購清單"></div>
           <div class="field"><label>Email 寄送清單時的預設收件人</label><input type="email" id="settingsEmail" placeholder="you@example.com"></div>
           <div class="field">
             <div class="room-manage-head">
@@ -358,10 +360,10 @@
       </div>
       <div class="modal-scrim" id="plannerAddScrim">
         <div class="modal">
-          <h3>加入設計組合到採購清單</h3>
-          <p>Planner 設計組合抓不到官網那種商品資料，這幾欄請自己確認或修改。</p>
+          <h3 id="plannerAddTitle">加入設計組合到採購清單</h3>
+          <p id="plannerAddDesc">Planner 設計組合抓不到官網那種商品資料，這幾欄請自己確認或修改。</p>
           <div class="field"><label>商品名稱</label><input type="text" id="plannerAddName" placeholder="例如：BILLY 書櫃組合"></div>
-          <div class="field"><label>設計編號</label><input type="text" id="plannerAddArticleNo" placeholder="例如：32GQ6TK"></div>
+          <div class="field"><label id="plannerAddArticleNoLabel">設計編號</label><input type="text" id="plannerAddArticleNo" placeholder="例如：32GQ6TK"></div>
           <div class="field"><label>金額</label><input type="text" inputmode="numeric" id="plannerAddPrice" placeholder="0"></div>
           <div class="field"><label>加入空間</label><select id="plannerAddRoom"></select></div>
           <div class="modal-actions">
@@ -380,6 +382,7 @@
       tabBadge: shadow.getElementById("tabBadge"),
       scrim: shadow.getElementById("scrim"),
       drawer: shadow.getElementById("drawer"),
+      drawerTitle: shadow.getElementById("drawerTitle"),
       headSubtitle: shadow.getElementById("headSubtitle"),
       roomChips: shadow.getElementById("roomChips"),
       itemList: shadow.getElementById("itemList"),
@@ -387,6 +390,7 @@
       totalValue: shadow.getElementById("totalValue"),
       toastRegion: shadow.getElementById("toastRegion"),
       settingsScrim: shadow.getElementById("settingsScrim"),
+      settingsListName: shadow.getElementById("settingsListName"),
       settingsEmail: shadow.getElementById("settingsEmail"),
       settingsEnabledToggle: shadow.getElementById("settingsEnabledToggle"),
       roomManage: shadow.getElementById("roomManage"),
@@ -403,7 +407,10 @@
       plannerQuickAdd: shadow.getElementById("plannerQuickAdd"),
       plannerQuickAddLabel: shadow.getElementById("plannerQuickAddLabel"),
       plannerAddScrim: shadow.getElementById("plannerAddScrim"),
+      plannerAddTitle: shadow.getElementById("plannerAddTitle"),
+      plannerAddDesc: shadow.getElementById("plannerAddDesc"),
       plannerAddName: shadow.getElementById("plannerAddName"),
+      plannerAddArticleNoLabel: shadow.getElementById("plannerAddArticleNoLabel"),
       plannerAddArticleNo: shadow.getElementById("plannerAddArticleNo"),
       plannerAddPrice: shadow.getElementById("plannerAddPrice"),
       plannerAddRoom: shadow.getElementById("plannerAddRoom"),
@@ -439,7 +446,7 @@
     // 診斷用的程式碼不應該有能力弄壞正式功能，這裡補上 try/catch 加 null 檢查雙重防呆。
     try {
       const h2 = shadow.querySelector(".drawer-head h2");
-      console.log("[IKEA 採購清單][字體診斷]", {
+      console.log("[RoomList][字體診斷]", {
         網址: location.hostname,
         面板h2實際computed字體: h2 ? getComputedStyle(h2).fontSize : "(找不到元素)",
         devicePixelRatio: window.devicePixelRatio,
@@ -447,7 +454,7 @@
         html的transform: getComputedStyle(document.documentElement).transform
       });
     } catch (e) {
-      console.warn("[IKEA 採購清單] 字體診斷本身出錯（不影響面板功能）：", e);
+      console.warn("[RoomList] 字體診斷本身出錯（不影響面板功能）：", e);
     }
   }
 
@@ -551,6 +558,7 @@
     state.items = items;
     state.settings = settings;
     state.rooms = settings.rooms;
+    els.drawerTitle.textContent = settings.listName || storage.DEFAULT_LIST_NAME;
     if (state.activeRoom !== "全部" && !state.rooms.includes(state.activeRoom)) state.activeRoom = "全部";
     // 商品可能已經被移除（例如在別的分頁刪除），選取狀態要跟著清掉，不然刪除已選取
     // 會想刪一個早就不存在的 id
@@ -597,6 +605,16 @@
     const existing = existingById || state.items.find((i) => storage.sameProduct(i, product));
     plannerEditingItemId = existing ? existing.id : null;
     const base = existing || product;
+    // 這顆浮動按鈕／表單不是只有 Planner 在用：content-script.js 在一般商品頁（PChome、
+    // momo...）找不到原生收藏按鈕可以攔截時，也會共用同一套當保底入口，所以文案要看
+    // 當下是不是真的在 Planner 頁面才決定講「設計編號」還是「商品貨號」，不能寫死。
+    const onPlanner = adapter.isPlannerPage();
+    els.plannerAddTitle.textContent = onPlanner ? "加入設計組合到採購清單" : "加入商品到採購清單";
+    els.plannerAddDesc.textContent = onPlanner
+      ? "Planner 設計組合抓不到官網那種商品資料，這幾欄請自己確認或修改。"
+      : "自動擷取的資料如果有誤，這幾欄可以自己確認或修改。";
+    els.plannerAddArticleNoLabel.textContent = onPlanner ? "設計編號" : "商品貨號";
+    els.plannerAddArticleNo.placeholder = onPlanner ? "例如：32GQ6TK" : "";
     els.plannerAddName.value = base.name || "";
     els.plannerAddArticleNo.value = base.articleNo || "";
     els.plannerAddPrice.value = base.price ? formatPriceInputValue(String(base.price)) : "";
@@ -862,10 +880,6 @@
     const rect = anchorEl.getBoundingClientRect();
     const pop = document.createElement("div");
     pop.className = "pop";
-    let top = rect.bottom + 6;
-    if (top + 280 > window.innerHeight) top = rect.top - 8 - 260;
-    pop.style.top = Math.max(8, top) + "px";
-    pop.style.left = Math.min(window.innerWidth - 208, Math.max(8, rect.left - 150)) + "px";
 
     const label = document.createElement("div");
     label.className = "pop-label";
@@ -899,7 +913,31 @@
       pop.appendChild(removeBtn);
     }
 
+    // 選單實際高度取決於空間數量（使用者可以自訂，不一定是預設 8 個）跟這個商品是不是
+    // 已經在清單裡（在的話會多一顆「移除收藏」，高度再多一截）——這兩件事都沒辦法在
+    // 組出內容之前用一個寫死的數字準確猜到。之前這裡猜「280」/「260」，遇到空間數量
+    // 較多、或商品已在清單裡（多出移除收藏按鈕）時，猜的高度比實際內容矮，導致明明
+    // 貼著畫面下緣放不下，卻誤判成「往下展開放得下」，選單因此被畫面邊緣截斷（使用者
+    // 在淘寶商品頁實測回報過這個狀況，看不到最下面的「移除收藏」）。
+    // 改成內容先組好、掛進 DOM（先隱藏、避免使用者看到還沒定位好的畫面閃一下）量出
+    // 真正的 offsetHeight，再決定要往下展開、往上展開，或兩邊都放不下時貼齊邊界並讓
+    // 選單自己捲動（極端情況，例如視窗很矮又自訂了很多空間）。
+    pop.style.visibility = "hidden";
     shadow.querySelector(".root").appendChild(pop);
+    const popHeight = pop.offsetHeight;
+    const margin = 8;
+    let top = rect.bottom + 6;
+    if (top + popHeight + margin > window.innerHeight) top = rect.top - 6 - popHeight;
+    top = Math.min(Math.max(margin, top), window.innerHeight - popHeight - margin);
+    if (top < margin) {
+      top = margin;
+      pop.style.maxHeight = window.innerHeight - margin * 2 + "px";
+      pop.style.overflowY = "auto";
+    }
+    pop.style.top = top + "px";
+    pop.style.left = Math.min(window.innerWidth - 208, Math.max(8, rect.left - 150)) + "px";
+    pop.style.visibility = "";
+
     activePop = pop;
     setTimeout(() => document.addEventListener("click", onDocClickClosePop, true), 0);
   }
@@ -926,6 +964,7 @@
     });
   }
   function openSettings() {
+    els.settingsListName.value = state.settings.listName || storage.DEFAULT_LIST_NAME;
     els.settingsEmail.value = state.settings.defaultEmail || "";
     els.settingsEnabledToggle.checked = state.settings.extensionEnabled !== false;
     renderRoomManage();
@@ -951,11 +990,19 @@
     toast("已把預設空間補回來");
   }
   async function saveSettings() {
-    await storage.setSettings({
+    // 原本存完就丟掉回傳值，标题文字改用 storage.onChange(refresh) 那條非同步回圈自己
+    // 更新——這條回圈理論上該觸發，但等它繞一圈才更新畫面，使用者點「儲存」的當下會
+    // 覺得「按了沒反應」（其實已經存進去了，只是畫面標題還沒跟上）。改成直接用
+    // storage.setSettings() 回傳的最新設定同步更新 state 跟標題文字，跟按鈕點擊同一個
+    // 步驟內完成，不用等外部事件繞回來。
+    const next = await storage.setSettings({
+      listName: els.settingsListName.value.trim() || storage.DEFAULT_LIST_NAME,
       defaultEmail: els.settingsEmail.value.trim(),
       rooms: state.rooms,
       extensionEnabled: els.settingsEnabledToggle.checked
     });
+    state.settings = next;
+    els.drawerTitle.textContent = next.listName || storage.DEFAULT_LIST_NAME;
     closeSettings();
     toast(els.settingsEnabledToggle.checked ? "設定已儲存" : "已暫停擴充功能，商品頁的愛心恢復官網原本行為");
   }
@@ -964,7 +1011,7 @@
   // 從 PDF 裡把那段文字複製回來貼在這裡就能救回。用 base64 而不是直接放中文，是因為
   // 瀏覽器印出 PDF 時，中文很可能是用內嵌字型的字符索引畫出來的，不一定能被可靠地
   // 複製回原本的文字；base64 全部是 ASCII，PDF 文字圖層對這種內容的還原一向可靠。
-  const BACKUP_MARKER = "IKEAWISHLIST_BACKUP_V1:";
+  const BACKUP_MARKER = "ROOMLIST_BACKUP_V1:";
 
   function toBase64Utf8(str) {
     const bytes = new TextEncoder().encode(str);
@@ -1083,43 +1130,30 @@
         });
         body += `</tbody></table>`;
       });
-    // 直接連到官網自己 host 的 logo 檔案（/webroot/img/logos/IKEA_logo.svg，TW／HK 都實測
-    // 存在同一個路徑），不是複製一份官方素材塞進擴充功能裡。連不到的話（離線、路徑改版）
-    // 用 onerror 換成純文字色塊，不會整個版面壞掉。
-    // 網域故意不用 location.hostname：在 planner.ikea.com.tw 按「匯出 PDF」時
-    // location.hostname 會是 planner.ikea.com.tw，那個網域下根本沒有這個 webroot 路徑
-    // （Planner 是完全不同的另一套系統），導致每次從 Planner 匯出都直接觸發 onerror、
-    // logo 一律變成純文字色塊——改成依商品所屬市場（TW/HK）固定連到對應的官網主站，
-    // 不管是從哪個頁面按下匯出都會拿到同一個、真的存在的 logo 網址。
-    const logoHost = storage.currentMarket() === "HK" ? "www.ikea.com.hk" : "www.ikea.com.tw";
-    const logoUrl = `https://${logoHost}/webroot/img/logos/IKEA_logo.svg`;
-    return `<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><title>IKEA 採購清單</title>
+    // 標題直接沿用使用者在設定裡自訂的清單名稱（跟面板的 <h2 id="drawerTitle"> 同一個
+    // 資料來源，state.settings.listName），不是寫死的「RoomList 空間採購清單」——
+    // 面板標題跟 PDF 標題本來就該是同一份清單的同一個名字，使用者改了名稱兩邊要同步。
+    // 右上角原本放專案自己的圖示（房間外框＋單椅剪影），使用者覺得多餘、拿掉了；
+    // 拿掉 logo 後 .doc-header 不需要再用 flex/space-between 排版，簡化成單純的標題區塊。
+    const listName = escapeHtml(state.settings.listName || storage.DEFAULT_LIST_NAME);
+    return `<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><title>${listName}</title>
       <style>
-        body{font-family:-apple-system,"Microsoft JhengHei",sans-serif;color:#111;padding:32px;max-width:720px;margin:0 auto;}
-        .doc-header{display:flex;justify-content:space-between;align-items:flex-start;}
-        h1{color:#0058A3;margin:0;font-size:22px;}
-        .logo-img{height:36px;width:auto;}
-        .logo-fallback{display:none;align-items:center;justify-content:center;height:36px;padding:0 14px;background:#0058A3;color:#FFDB00;font-weight:800;font-size:15px;border-radius:3px;letter-spacing:.5px;}
-        .meta{color:#68707A;font-size:13px;margin:6px 0 24px;}
-        h2{font-size:15px;border-bottom:2px solid #0058A3;padding-bottom:6px;margin-top:28px;}
-        h2 small{color:#68707A;font-weight:400;font-size:12px;float:right;}
+        body{font-family:"Avenir Next","PingFang TC","Noto Sans TC",-apple-system,"Microsoft JhengHei",sans-serif;font-variant-numeric:tabular-nums;color:#111111;padding:32px;max-width:720px;margin:0 auto;}
+        h1{color:#111111;margin:0;font-size:22px;}
+        .meta{color:#767267;font-size:13px;margin:6px 0 24px;}
+        h2{font-size:15px;color:#111111;border-bottom:2px solid #C6A668;padding-bottom:6px;margin-top:28px;}
+        h2 small{color:#767267;font-weight:400;font-size:12px;float:right;}
         table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
-        th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #DEE1E4;}
-        th{color:#68707A;font-weight:600;}
-        .grand{margin-top:24px;text-align:right;font-size:18px;font-weight:800;color:#0058A3;}
-        .backup-block{margin-top:32px;padding-top:14px;border-top:1px dashed #DEE1E4;}
-        .backup-label{font-size:10px;color:#68707A;margin-bottom:4px;}
+        th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #E4DFD3;}
+        th{color:#767267;font-weight:600;}
+        .grand{margin-top:24px;text-align:right;font-size:18px;font-weight:700;color:#111111;border-top:2px solid #C6A668;padding-top:10px;}
+        .backup-block{margin-top:32px;padding-top:14px;border-top:1px dashed #E4DFD3;}
+        .backup-label{font-size:10px;color:#767267;margin-bottom:4px;}
         .backup-text{font-size:8px;font-family:"Courier New",monospace;color:#AAAAAA;word-break:break-all;line-height:1.6;}
         .footer-note{margin-top:16px;font-size:10.5px;color:#929292;text-align:center;}
         @media print{ body{padding:0;} }
       </style></head><body>
-      <div class="doc-header">
-        <h1>IKEA 採購清單</h1>
-        <div>
-          <img class="logo-img" src="${logoUrl}" alt="IKEA" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-          <div class="logo-fallback">IKEA</div>
-        </div>
-      </div>
+      <h1>${listName}</h1>
       <div class="meta">產生時間：${now}</div>
       ${body}
       <div class="grand">總金額：${fmt(roomTotal("全部"))}</div>
@@ -1127,7 +1161,7 @@
         <div class="backup-label">◆ 備份資料 —— 清單如果不小心被刪除，整段複製下面這串文字，貼到擴充功能設定裡的「從備份還原」即可救回：</div>
         <div class="backup-text">${escapeHtml(buildBackupText())}</div>
       </div>
-      <div class="footer-note">本工具由第三方獨立開發，非 IKEA 官方服務。</div>
+      <div class="footer-note">RoomList 為獨立工具，商品名稱、圖片與價格屬原電商頁面內容。</div>
       </body></html>`;
   }
 
@@ -1177,7 +1211,7 @@
     let body = lines.join("\n");
     if (body.length > 1500) body = body.slice(0, 1500) + "\n…（清單較長，已截斷，完整內容請另外按「匯出 PDF」查看）";
     const to = state.settings.defaultEmail || "";
-    const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent("IKEA 採購清單")}&body=${encodeURIComponent(body)}`;
+    const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent("RoomList 空間採購清單")}&body=${encodeURIComponent(body)}`;
     const a = document.createElement("a");
     a.href = mailto;
     document.body.appendChild(a);
@@ -1203,7 +1237,7 @@
   }
 
   // ---- 供 content-script.js 呼叫的公開 API ----
-  global.__ikeaPanel = {
+  global.__roomlistPanel = {
     mount: mountPanel,
     toggle: () => (els.drawer.classList.contains("open") ? closeDrawer() : openDrawer()),
     open: openDrawer,

@@ -13,18 +13,18 @@
 (function (global) {
   "use strict";
 
-  const SETTINGS_KEY = "ikeaWishlist_settings";
+  const SETTINGS_KEY = "roomList_settings";
   const LEGACY_ITEMS_KEY = "ikeaWishlist_items"; // 分市場之前的舊 key，只用來做一次性搬移
   const MIGRATED_FLAG_KEY = "ikeaWishlist_migratedToMarketKeys";
 
   const DEFAULT_ROOMS = ["客廳", "臥室", "書房", "浴室", "陽台", "廚房", "餐廳", "玄關"];
 
   function currentMarket() {
-    return location.hostname.includes("ikea.com.hk") ? "HK" : "TW";
+    return "TW";
   }
 
   function itemsKey() {
-    return `ikeaWishlist_items_${currentMarket()}`;
+    return "roomList_items";
   }
 
   function uid() {
@@ -43,10 +43,10 @@
     const legacyResult = await chrome.storage.local.get(LEGACY_ITEMS_KEY);
     const legacyItems = legacyResult[LEGACY_ITEMS_KEY];
     if (Array.isArray(legacyItems) && legacyItems.length) {
-      const twKey = "ikeaWishlist_items_TW";
-      const twResult = await chrome.storage.local.get(twKey);
-      if (!Array.isArray(twResult[twKey]) || twResult[twKey].length === 0) {
-        await chrome.storage.local.set({ [twKey]: legacyItems });
+      const nextKey = "roomList_items";
+      const nextResult = await chrome.storage.local.get(nextKey);
+      if (!Array.isArray(nextResult[nextKey]) || nextResult[nextKey].length === 0) {
+        await chrome.storage.local.set({ [nextKey]: legacyItems });
       }
     }
     await chrome.storage.local.set({ [MIGRATED_FLAG_KEY]: true });
@@ -66,13 +66,16 @@
     return chrome.storage.local.set({ [itemsKey()]: items });
   }
 
+  const DEFAULT_LIST_NAME = "我的採購清單";
+
   function getSettings() {
     return chrome.storage.local.get(SETTINGS_KEY).then((r) => {
       const s = r[SETTINGS_KEY] || {};
       return {
         defaultEmail: s.defaultEmail || "",
         rooms: Array.isArray(s.rooms) && s.rooms.length ? s.rooms : DEFAULT_ROOMS.slice(),
-        extensionEnabled: s.extensionEnabled !== false
+        extensionEnabled: s.extensionEnabled !== false,
+        listName: s.listName || DEFAULT_LIST_NAME
       };
     });
   }
@@ -209,8 +212,9 @@
     });
   }
 
-  global.__ikeaStorage = {
+  global.__roomlistStorage = {
     DEFAULT_ROOMS,
+    DEFAULT_LIST_NAME,
     currentMarket,
     getItems,
     setItems,

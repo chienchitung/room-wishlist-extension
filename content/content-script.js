@@ -20,14 +20,14 @@
 (function () {
   "use strict";
 
-  const adapter = window.__ikeaAdapter;
+  const adapter = window.__roomlistAdapter;
   // Planner（設計組合頁）是完全不同的 Babylon.js WebGL SPA，沒有官網那種可以攔截
   // 的收藏愛心按鈕，商品卡片的 class 也都不存在，所以這裡整段用 isPlannerPage()
   // 分流：一般商品頁走原本的攔截邏輯，Planner 頁改走 setupPlannerPage()。
   const onPlannerPage = adapter.isPlannerPage();
 
   // site-adapter.js 在 manifest 的 js 陣列裡排在這支檔案前面，兩者都在 document_start
-  // 同步執行，所以這裡一定拿得到 window.__ikeaAdapter，可以先算好選擇器字串，
+  // 同步執行，所以這裡一定拿得到 window.__roomlistAdapter，可以先算好選擇器字串，
   // 避免每次點擊（頁面上任何地方的點擊都會經過這個 capture listener）都重算一次。
   const FAVORITE_SELECTOR = onPlannerPage
     ? ""
@@ -38,12 +38,12 @@
   // 先樂觀預設為 true（開），等真正的設定值讀回來、或使用者改設定時再更新。
   let extensionEnabled = true;
   function refreshEnabledFlag() {
-    window.__ikeaStorage.getSettings().then((s) => {
+    window.__roomlistStorage.getSettings().then((s) => {
       extensionEnabled = s.extensionEnabled !== false;
     });
   }
   refreshEnabledFlag();
-  window.__ikeaStorage.onChange(refreshEnabledFlag);
+  window.__roomlistStorage.onChange(refreshEnabledFlag);
 
   if (!onPlannerPage) document.addEventListener("click", onCaptureClick, true);
 
@@ -58,7 +58,7 @@
   }
 
   function handleFavoriteClick(btn) {
-    const panel = window.__ikeaPanel;
+    const panel = window.__roomlistPanel;
 
     // 先判斷這顆愛心是不是「落在已知的清單卡片容器裡」（.itemBlock / .product-carousel__item
     // 這類明確、只用在重複列表項目上的 class，不會用在頁面自己的獨有內容上）。
@@ -84,7 +84,7 @@
       product = adapter.extractProduct();
     }
     if (!product) {
-      console.warn("[IKEA 採購清單] 無法從這個收藏按鈕辨識商品資料，選擇器可能需要用 DevTools 更新", btn);
+      console.warn("[RoomList] 無法從這個收藏按鈕辨識商品資料，選擇器可能需要用 DevTools 更新", btn);
       panel.notifyExtractionFailed();
       return;
     }
@@ -105,14 +105,14 @@
    * 跟同一頁面在跑的 Babylon.js 3D 引擎比起來可以忽略不計）。
    */
   function setupPlannerPage() {
-    const panel = window.__ikeaPanel;
+    const panel = window.__roomlistPanel;
     // 只在「原因改變」時印出來，不然 3 秒一次的輪詢會一直洗版；在 DevTools Console
     // 打開就能直接看到按鈕現在為什麼是顯示/隱藏，不用再靠使用者口頭描述來回猜。
     let lastLoggedReason = "";
     function logReason(reason) {
       if (reason === lastLoggedReason) return;
       lastLoggedReason = reason;
-      console.log("[IKEA 採購清單][Planner]", reason);
+      console.log("[RoomList][Planner]", reason);
     }
 
     function syncPlannerButton() {
@@ -139,11 +139,11 @@
     window.addEventListener("hashchange", syncPlannerButton);
     [800, 2000, 4000].forEach((ms) => setTimeout(syncPlannerButton, ms));
     setInterval(syncPlannerButton, 3000);
-    window.__ikeaStorage.onChange(syncPlannerButton);
+    window.__roomlistStorage.onChange(syncPlannerButton);
   }
 
   function mountWhenReady() {
-    const panel = window.__ikeaPanel;
+    const panel = window.__roomlistPanel;
     function afterMount() {
       // panel.mount() 出過一次意外（面板本身早就蓋好了，但函式最後一段某個地方拋出例外），
       // 導致這裡整段中斷、下面判斷要不要顯示 Planner 浮動按鈕的邏輯完全沒機會執行到——
@@ -151,9 +151,19 @@
       try {
         panel.mount();
       } catch (e) {
-        console.warn("[IKEA 採購清單] panel.mount() 發生例外，面板可能沒有完整初始化：", e);
+        console.warn("[RoomList] panel.mount() 發生例外，面板可能沒有完整初始化：", e);
       }
       if (onPlannerPage) setupPlannerPage();
+      else {
+        const syncProductQuickAdd = () => {
+          const product = adapter.extractProduct();
+          if (product && adapter.isProductPage()) panel.showPlannerQuickAdd(product);
+          else panel.hidePlannerQuickAdd();
+        };
+        syncProductQuickAdd();
+        document.addEventListener("DOMContentLoaded", syncProductQuickAdd, { once: true });
+        [600, 1600, 3200].forEach((ms) => setTimeout(syncProductQuickAdd, ms));
+      }
     }
     if (document.documentElement) {
       afterMount();
@@ -164,7 +174,7 @@
   mountWhenReady();
 
   chrome.runtime.onMessage.addListener((msg) => {
-    const panel = window.__ikeaPanel;
+    const panel = window.__roomlistPanel;
     if (msg.type === "TOGGLE_PANEL") panel.toggle();
   });
 })();

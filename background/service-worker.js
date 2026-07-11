@@ -11,6 +11,6 @@
 chrome.action.onClicked.addListener((tab) => {
   if (!tab.id) return;
   chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_PANEL" }).catch(() => {
-    /* 該分頁可能不是 ikea.com.tw，沒有 content script 可回應 */
+    /* 該分頁可能不是支援的購物網站，沒有 content script 可回應 */
   });
 });

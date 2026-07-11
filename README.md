@@ -1,136 +1,66 @@
-# IKEA 採購清單小幫手
+![RoomList](icons/logo-lockup.svg)
 
-一款支援 IKEA 台灣與香港官網的 Chrome 擴充功能。瀏覽商品時，不需要登入 IKEA 帳號，就能使用官網原生愛心按鈕收藏商品、依空間整理採購清單、自動計算預算，並將清單匯出成 PDF 或透過 Email 分享。
+# RoomList 空間採購清單
 
-> 本工具由第三方獨立開發，非 IKEA 官方服務。
+RoomList 是一款跨電商 Chrome 擴充功能。使用者可從商品頁將家居商品加入本機清單，並依客廳、臥室、書房等空間整理預算。
 
-## 操作示範
-
-[![IKEA 採購清單小幫手操作示範](docs/assets/ikea-wishlist-demo.gif)](docs/assets/ikea-wishlist-demo.mp4)
-
-點選上方影片可開啟高畫質 MP4。
-
-操作流程：點選商品愛心 → 選擇空間 → 開啟採購清單 → 查看分類與總金額 → 匯出 PDF。
-
-## 主要功能
-
-- **免登入收藏**：攔截 IKEA 官網原生愛心按鈕，將商品直接儲存在瀏覽器本機。
-- **依空間分類**：內建客廳、臥室、書房、浴室、陽台、廚房、餐廳與玄關，也可以新增自訂空間。
-- **預算自動加總**：即時計算各空間小計與整份清單總金額。
-- **數量與單價調整**：可修改商品數量，也能直接編輯單價。
-- **商品管理**：支援移動空間、單筆刪除、篩選後全選與批次刪除。
-- **匯出 PDF**：產生包含空間分類、商品明細、小計與總金額的採購清單。
-- **Email 分享**：開啟預設郵件軟體，帶入清單主旨與文字內容。
-- **備份與還原**：PDF 內包含清單備份文字，可在設定中貼上並選擇要還原的商品。
-- **台灣／香港分開儲存**：兩個市場的清單與幣別互不混用，分別顯示 NT$ 與 HK$。
-- **IKEA Planner 支援**：可將 Planner 設計組合加入清單，手動確認名稱、設計編號、金額與空間。
-
-## 安裝方式
-
-目前以「載入未封裝擴充功能」的方式安裝：
-
-1. 下載或 clone 此專案。
-2. 在 Chrome 網址列輸入 `chrome://extensions`。
-3. 開啟右上角的「開發人員模式」。
-4. 點選「載入未封裝項目」。
-5. 選擇此專案的 `ikea-wishlist-extension` 資料夾。
-6. 前往 [IKEA 台灣](https://www.ikea.com.tw/zh) 或 [IKEA 香港](https://www.ikea.com.hk/zh) 官網開始使用。
-
-更新程式碼後，請回到 `chrome://extensions` 按下重新載入，再重新整理 IKEA 網頁。
-
-## 使用方式
-
-### 收藏商品
-
-在商品列表、搜尋結果、推薦商品或單一商品頁，點選 IKEA 官網原本的愛心按鈕。擴充功能會顯示空間選單，選擇後商品便會加入採購清單。
-
-如果商品已在清單中，再次點選愛心可以移動到其他空間或移除收藏。
-
-### 管理採購清單
-
-點選頁面右側的「採購清單」標籤開啟面板，可以：
-
-- 依空間篩選商品。
-- 增減商品數量。
-- 點選金額修改單價。
-- 將商品移動到其他空間。
-- 勾選多項商品後批次刪除。
-- 點選商品名稱回到 IKEA 商品頁。
-
-### 匯出 PDF
-
-在清單面板底部點選「匯出 PDF」，Chrome 會開啟列印視窗。將目的地選為「另存為 PDF」即可儲存。
-
-PDF 末端會附上備份文字。如果清單日後遺失，可以複製該段文字，前往「設定 → 從備份還原」重新匯入。
-
-### Email 分享
-
-在清單面板底部點選「Email 寄送清單內容」，擴充功能會使用 `mailto:` 開啟電腦的預設郵件軟體，並自動帶入主旨與清單文字。
-
-此功能不會自動附加 PDF；如需附件，請先匯出 PDF 後自行加入郵件。
-
-### IKEA Planner 設計組合
-
-在 `planner.ikea.com.tw` 或 `planner.ikea.com.hk` 的設計頁面，右下角會顯示「加入採購清單」按鈕。
-
-由於 Planner 不一定提供可穩定讀取的完整價格資料，加入前會開啟確認表單，讓使用者自行檢查或修改：
-
-- 設計名稱
-- 設計編號
-- 金額
-- 所屬空間
-
-## 資料與隱私
-
-- 商品清單與設定儲存在 `chrome.storage.local`。
-- 資料只存在目前使用的 Chrome profile，不會上傳到專案作者的伺服器。
-- 不需要 IKEA 帳號、API 金鑰或第三方服務帳號。
-- Email 功能只會開啟本機預設郵件軟體，不會由擴充功能代為寄信。
+RoomList 為獨立開發工具，與 IKEA、PChome、momo、蝦皮、酷澎、宜得利、特力屋、淘寶、天貓或其他電商品牌無隸屬、合作或授權關係。商品名稱、圖片、價格與商標均屬原網站權利人。
 
 ## 支援網站
 
-- `https://www.ikea.com.tw/*`
-- `https://www.ikea.com.hk/*`
-- `https://planner.ikea.com.tw/*`
-- `https://planner.ikea.com.hk/*`
+| 網站 | 收藏按鈕辨識方式 | 信心程度 |
+| --- | --- | --- |
+| IKEA 台灣、香港 | class／a11y-label | 高（長期驗證） |
+| PChome 24h | `data-regression` 屬性 | 高（實測 HTML 驗證） |
+| momo 購物網 | `aria-label` | 高（實測 HTML 驗證） |
+| 宜得利家居台灣 | `aria-label`（固定字串） | 高（實測 HTML 驗證） |
+| 特力屋線上購物 | BEM class | 高（實測 HTML 驗證） |
+| 淘寶網、天貓 Tmall | `#collectBtn`（穩定 id） | 高（實測 HTML 驗證） |
+| 蝦皮購物 | 愛心圖示 SVG path | 中（雜湊 class 較多，改版風險較高） |
+| 酷澎台灣 | 語意化 wrapper class | 中（雜湊 class 較多，改版風險較高） |
 
-## 已知限制
+「信心程度」是指原生收藏按鈕選擇器有沒有拿真實頁面 HTML 驗證過，不代表功能好壞——即使選擇器失效，商品頁仍會顯示 RoomList 自有的保底加入按鈕（見下方說明）。各電商前端持續改版，這份表格會隨時間過時，上線前仍應實機驗證。
 
-- IKEA 官網改版後，商品愛心或資料擷取方式可能需要同步調整。
-- IKEA 香港部分頁面的收藏元件可能與台灣版不同，需要依實際頁面持續驗證。
-- Planner 的價格與完整零件資訊無法保證自動取得，必要時需手動輸入。
-- Email 分享使用 `mailto:`，是否能正常開啟取決於電腦是否已設定預設郵件軟體。
-- 備份還原只支援本擴充功能產生的備份格式。
+淘寶網、天貓是跨境購物（人民幣計價），RoomList 會優先讀取頁面上「跨境到台灣大約多少新台幣」的估價文字；找不到時才退回用人民幣原價乘上一個寫死的粗略匯率，不會即時反映匯率變動。
 
-## 專案結構
+## 操作方式
+
+1. 在 `chrome://extensions` 開啟開發人員模式。
+2. 選擇「載入未封裝項目」，載入本專案資料夾。
+3. 前往支援的商品頁。
+4. 點原網站的追蹤／收藏按鈕，或點頁面右下角的「加入採購清單」。
+5. 選擇空間後，商品會加入跨網站共用清單。
+
+原生收藏按鈕會由站點 adapter 嘗試辨識；即使網站改版導致選擇器失效，商品頁仍會顯示 RoomList 自有的加入按鈕作為保底。
+
+## 架構
 
 ```text
-ikea-wishlist-extension/
+room-wishlist-extension/
 ├── manifest.json
-├── background/
-│   └── service-worker.js
+├── background/service-worker.js
 ├── content/
-│   ├── content-script.js
-│   ├── panel.js
 │   ├── site-adapter.js
-│   └── storage.js
-├── docs/
-│   └── assets/
+│   ├── storage.js
+│   ├── panel.js
+│   └── content-script.js
 └── icons/
 ```
 
-- `manifest.json`：Chrome Extension Manifest V3 設定。
-- `background/service-worker.js`：處理工具列圖示與面板切換。
-- `content/content-script.js`：掛載介面並攔截收藏操作。
-- `content/panel.js`：採購清單、設定、匯出與還原介面。
-- `content/site-adapter.js`：讀取 IKEA 商品與 Planner 資料。
-- `content/storage.js`：本機資料儲存與清單操作。
+- `site-adapter.js`：站點規則、JSON-LD、Open Graph 與 DOM 三層商品解析。
+- `storage.js`：跨網站共用的本機商品與空間資料。
+- `panel.js`：RoomList 品牌介面、清單管理、PDF 與 Email 分享。
+- `content-script.js`：攔截可辨識的原生收藏按鈕並提供自有保底按鈕。
 
-## 開發與驗證
+## 已知限制
 
-此專案不需要建置工具或套件安裝。修改 JavaScript 後，可先執行語法檢查：
+- IKEA Planner（`planner.ikea.com.tw`／`.hk`，設計組合頁）目前無法自動偵測設計編號／品項數，浮動的「加入採購清單」按鈕不會出現。`site-adapter.js` 裡的 `extractPlannerDesign()`／`countPlannerParts()` 是還沒補回來的 stub，完整實作還留在 git 歷史裡（`git show HEAD:content/site-adapter.js`）。
+- 蝦皮、酷澎的原生收藏按鈕選擇器用的是雜湊 class／SVG 圖示，比其他站的 `aria-label`／`id` 脆弱，兩站改版後可能需要重新抓選擇器。
+
+## 驗證
 
 ```bash
+python3 -m json.tool manifest.json > /dev/null
 node --check background/service-worker.js
 node --check content/content-script.js
 node --check content/panel.js
@@ -138,4 +68,4 @@ node --check content/site-adapter.js
 node --check content/storage.js
 ```
 
-接著在 `chrome://extensions` 重新載入擴充功能，並於 IKEA 台灣、香港及 Planner 頁面實際測試。
+各電商前端會持續改版；上線前仍應在已登入與未登入狀態各做一次實機點擊驗證。

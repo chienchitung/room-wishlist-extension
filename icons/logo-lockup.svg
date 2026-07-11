@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 72" role="img" aria-labelledby="lockup-title">
+  <title id="lockup-title">RoomList</title>
+  <g transform="translate(0,4)">
+    <rect width="64" height="64" rx="16" fill="#FFFFFF" stroke="#EDE7DA" stroke-width="1.5"/>
+    <g transform="translate(7,7) scale(.390625)">
+      <path d="M21 57 59 27c3-2.4 7-2.4 10 0l38 30v43c0 4.4-3.6 8-8 8H29c-4.4 0-8-3.6-8-8V57Z"
+            fill="none" stroke="#C6A668" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M62 52v52M25 76h37M62 84h41"
+            fill="none" stroke="#2A2E2E" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M82.5 52.5c-5.6-6-14-1.6-14 5.4 0 6.2 5.4 10.5 14 16.2 8.6-5.7 14-10 14-16.2 0-7-8.4-11.4-14-5.4Z"
+            fill="#2A2E2E"/>
+    </g>
+  </g>
+  <text x="80" y="47" font-family="Avenir Next, 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif" font-size="34" font-weight="700" fill="#2A2E2E">RoomList</text>
+</svg>

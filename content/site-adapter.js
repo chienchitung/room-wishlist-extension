@@ -1,382 +1,308 @@
-/**
- * site-adapter.js
- *
- * 這支檔案集中管理「如何從 ikea.com.tw／ikea.com.hk 頁面讀資料 / 操作按鈕」的邏輯。
- * 下面的選擇器是實際下載／使用者回報的原始碼比對出來的，可信度標註在註解中：
- *   [實測] 有從真實 HTML 找到對應的 class／元素
- *   [推論] 只從 CSS／JS bundle 內容反推使用位置，沒看過實際頁面即時渲染結果，建議用 DevTools 再核對一次
- *
- * 重要背景：官網目前同時存在「兩套」前端元件系統，選擇器分兩組並列，firstMatch() 兩組都會試：
- *   1. 舊系統：jQuery + 自訂 Vue 元件（bbVue），class 像 .itemBlock／.card-favorites／.itemName
- *   2. 新系統：IKEA 官方的 Skapa 設計系統 Web Component（<skapa-button>／<skapa-price>／
- *      <skapa-image> 這類自訂元素），class 像 .product-carousel__item／.wish-list-button__container
- * 從使用者回報＋實際 HTML 來看，例如「其他相關產品」這類推薦商品區塊已經改用新系統，
- * 但「最常搭配購買的商品」（Dynamic Yield 輪播）還是舊系統 —— 同一個頁面上兩套並存。
- * 收藏功能沒登入會被導去登入頁（原始碼裡 redirectToLogin('add_to_favorite') 是寫死的，
- * 新系統的 <skapa-button a11y-label="accessibility.wishlist-remove"> 推測行為一致）。
- * 這支擴充功能用「攔截」而非「額外加按鈕」：在原生愛心按鈕上攔截點擊事件，阻止它導去登入頁，
- * 改叫我們自己不需要登入的空間選擇彈窗，使用者永遠只看到「一顆」愛心。
- *
- * TW／HK 兩地共用：卡片模板（.itemBlock／.itemName／.itemFacts／.itemOfferPrice／
- * .itemNormalPrice）跟品號網址格式（-art-/-spr- + 8碼數字）兩地實測完全一樣，是同一套
- * webroot 平台。但「收藏」按鈕本身兩地不同元件：TW 卡片用 .card-favorites，HK 用一個
- * 獨立套件（@bitbox/hongkong/wish-list-global，比 TW 多了「可建立多個清單」的功能）
- * 叫 <wish-list-button>。這支元件最後會渲染成什麼 class 沒辦法用 curl 看到（要等
- * client-side JS 執行完），但把它的 JS bundle 抓下來看裡面的字串，確認它跟 TW 一樣是用
- * Skapa 元件蓋的（bundle 裡找得到一樣的 'sk-icon' class 名稱、一樣的
- * accessibility.wishlist-add/remove 標籤字串），所以額外加了 [a11y-label*='wishlist']
- * 這個「語意化」選擇器 —— 不管兩地各自包了什麼樣的外層 class，只要底層都是同一顆
- * Skapa 按鈕、帶著同樣的無障礙標籤，這個屬性選擇器就抓得到。.inFavList 則是兩地都在原始碼
- * 裡看過的收藏鈕狀態 class（TW 在 buttons.css、HK 在 PDP 主收藏鈕的即時模板）。
- */
 (function (global) {
   "use strict";
 
-  const DOM_SELECTORS = {
-    // ---- 商品清單卡片：舊系統（.itemBlock）+ 新系統（Skapa Web Component）並列 ----
-    // 找不到卡片容器時（例如又是另一種沒見過的版型），findCardContainer() 會往上层層比對。
-    cardRoot: [".card.itemBlock", ".itemBlock", ".product.product-carousel__item", ".product-carousel__item"], // [實測]
-    // [a11y-label*='wishlist'] 是跨 TW/HK 通用的語意化選擇器（見檔頭說明）；.inFavList
-    // 是兩地原始碼都出現過的收藏鈕狀態 class；wish-list-button 是 HK 專屬的 Vue 元件標籤本身，
-    // 保底用（元件最終渲染結果不明，直接抓元件標籤至少能定位到按鈕大概位置）。
-    cardFavoriteButton: [".card-favorites", ".wish-list-button__container", "[a11y-label*='wishlist']", ".inFavList", "wish-list-button"], // [.card-favorites/.wish-list-button__container 實測(TW)，其餘見上方說明]
-    cardName: [".itemName h6", ".itemName", ".name__container h2"], // [實測]
-    cardNameFallback: ["[class*='itemName']", "[class*='item-name']", "[class*='productName']", "[class*='product-name']", "h6", "h3", "h5"], // [推論]
-    // 卡片上「GLOSTAD」（品牌詞）跟「雙人座沙發，Knisa 藍色」（中文描述）是兩個分開的
-    // 元素，中文描述在這裡（舊系統 .itemFacts / 新系統 .facts），擷取時會接在品牌詞後面。
-    cardFacts: [".itemDetails .itemFacts", ".itemFacts", ".product__description .facts", ".typography-label-m.typography-regular.facts", "[class*='facts']"], // [實測]
-    cardLink: ["a.itemName", "a.d-block.w-100", ".name__container a.link", "a.product-image__container"], // [實測]
-    cardImage: ["img"], // [實測；舊系統圖片可能用 lazySizes 延遲載入，見 imageUrlOf()]
-    // 價格選擇器刻意不用 [class*='itemPrice'] 這種寬鬆寫法 —— 實測發現它會連
-    // .itemPriceBox 這個「外層容器」都選到，裡面同時包著現在價、單位（例如「/44公尺」）
-    // 跟劃線的舊價格，三組數字的文字被一起讀出來，再交給 parsePriceNumber 就串成一個
-    // 完全錯誤的天文數字（例如 $69/44公尺、之前價格$79 被讀成 694479）。新系統同理，
-    // <skapa-price> 也可能同時有現價跟劃線舊價，所以特別限定在 .unit-price__container
-    // 裡面那個 <skapa-price>，不要抓到 .price-addons 裡的劃線舊價。
-    cardOfferPrice: [".itemOfferPrice", ".itemLowerPrice", ".unit-price__container skapa-price"], // [實測]
-    cardNormalPrice: [".itemNormalPrice"], // [實測]
-    cardPriceFallback: ["[class*='OfferPrice']", "[class*='LowerPrice']", "[class*='NormalPrice']", "skapa-price"], // [推論]
-
-    // ---- 單一商品頁（PDP）----
-    // .addFavorites 現在確認是真的：使用者回報「缺貨商品抓不到名稱/貨號」時貼出的實際 PDP
-    // 原始碼裡看到了完整結構 <button class="addFavorites inFavList" data-action="favorites"
-    // data-item="29618209" data-name="RISBYN/HAVSDJUP" data-price="739" ...>，不只 class
-    // 得到驗證，還發現按鈕本身直接帶著 data-item／data-name／data-price 這三個屬性 ——
-    // 這組資料不管商品缺不缺貨都在，比猜「這是不是商品頁」再去湊 JSON-LD/OG/DOM 可靠很多，
-    // 見下面的 extractProductFromButtonData()。.wish-list-button__container 是從「其他相關
-    // 產品」卡片上實測到的新系統收藏鈕，PDP 主要的收藏鈕很可能是同一套元件，一併加進來。
-    pdpFavoriteButton: [".addFavorites", ".removeFavorites", ".wish-list-button__container", "[a11y-label*='wishlist']", ".inFavList", "wish-list-button"], // [.addFavorites/.removeFavorites 實測，.wish-list-button__container 實測（來自卡片，PDP本身未直接驗證），其餘見檔頭 TW/HK 共用選擇器說明]
-    productTitle: ["h1[data-testid='product-title']", "h1.product-title", "h1"], // [推論，PDP 未實測]
-    // 商品名稱在頁面上常常只有品牌詞本身（例如「GULLVALLA」），完整描述（例如「三人座沙發，
-    // Silkeryd 灰綠色」）是另一個獨立的元素 —— 借用卡片版型上實測到的 .itemFacts / .facts
-    // class 猜測 PDP 用的也是同一套，抓到的話會接在品牌詞後面組成完整名稱，見 extractProduct()。
-    productFacts: [".itemDetails .itemFacts", ".itemFacts", ".typography-label-m.typography-regular.facts", "[class*='facts']"], // [推論，PDP 未實測]
-    price: ["[data-testid='product-price']", ".itemOfferPrice", ".itemLowerPrice", ".itemNormalPrice", ".unit-price__container skapa-price", "skapa-price"],
-    articleNumber: ["[data-testid='product-article-number']", ".product-article-number", "[data-article-number]"],
-    productImage: ["[data-testid='product-image'] img", ".product-image img"],
-
-    // 只用來判斷「這是不是單一商品頁」，不會被拿去自動點擊（一鍵加入購物車功能已移除，
-    // 詳見 README「已移除的功能」）
-    addToCartTrigger: ["#add-to-cart-button-pill", ".addToCartText:not(.d-none)", ".shopping-cart-icon.addToCartText"] // [實測]
+  const SITE_RULES = {
+    "www.ikea.com.tw": {
+      name: "IKEA 台灣",
+      buttons: [".addFavorites", ".removeFavorites", ".card-favorites", ".wish-list-button__container", "[a11y-label*='wishlist' i]"],
+      roots: [".itemBlock", ".product-carousel__item", "main"],
+      title: ["h1", ".itemName", ".name__container"],
+      price: [".itemOfferPrice", ".itemLowerPrice", ".itemNormalPrice", "skapa-price"]
+    },
+    "www.ikea.com.hk": {
+      name: "IKEA 香港",
+      buttons: [".addFavorites", ".removeFavorites", "wish-list-button", ".wish-list-button__container", "[a11y-label*='wishlist' i]"],
+      roots: [".itemBlock", ".product-carousel__item", "main"],
+      title: ["h1", ".itemName", ".name__container"],
+      price: [".itemOfferPrice", ".itemLowerPrice", ".itemNormalPrice", "skapa-price"]
+    },
+    // PChome 商品頁的加入追蹤按鈕實際結構是
+    // <div class="c-compoundBtnTool c-compoundBtnTool--track" role="button"><button class="btn ..."><span class="btn__noFrame ...">
+    //   <i data-regression="prod_icon_add2Wish">/i><span data-regression="prod_txt_add2Wish">追蹤</span></span></button></div>
+    // 按鈕文字是「追蹤」不是「收藏」；data-regression 是 PChome 內部迴歸測試用的錨點，
+    // 比 class（會隨改版變動）穩定，外層 .c-compoundBtnTool--track 則涵蓋整個可點擊熱區。
+    "24h.pchome.com.tw": {
+      name: "PChome 24h",
+      buttons: [".c-compoundBtnTool--track", "[data-regression='prod_icon_add2Wish']", "[data-regression='prod_txt_add2Wish']"],
+      roots: ["main", "[class*='product']"], title: ["h1"], price: ["[class*='price']"]
+    },
+    // momo 商品頁的按鈕文字／aria-label 是「加入追蹤」不是「收藏」，緊鄰在「放入購物車」
+    // 按鈕右邊：<button aria-label="加入追蹤">...</button>。aria-label 直接掛在按鈕本身，
+    // 點擊時不管落在圖示或文字上，往上找都能命中同一顆按鈕。
+    "www.momoshop.com.tw": {
+      name: "momo 購物網",
+      buttons: ["button[aria-label='加入追蹤']", "button[aria-label*='追蹤']"],
+      roots: ["main", "#productForm", "[class*='product']"], title: ["h1", ".prdName"], price: [".price", "[class*='price']"]
+    },
+    // 使用者提供的實際 PDP HTML 找到的結構（在商品圖片下方、分享按鈕旁邊）：
+    // <button class="w2JMKY"><svg><path d="M19.469 1.262c-5.284-1.53-7.47..." stroke="#FF424F".../></svg>
+    //   <div class="rhG6k7">喜歡 (3)</div></button>
+    // 按鈕文字是「喜歡」不是「收藏」，且沒有 aria-label。class（w2JMKY／rhG6k7）看起來是
+    // CSS Modules 自動產生的雜湊值——rhG6k7 甚至同時用在旁邊「分享:」文字上，代表是共用的
+    // 文字樣式、不是這顆按鈕專屬的標記，蝦皮重新建置前端時很可能整批換掉。改用愛心圖示
+    // 本身的 SVG path 前綴當主要辨識依據，圖示美術稿改版頻率遠低於建置雜湊。
+    // 價格實測結構：<div class="IZPeQz B67UQ0">$45,900</div>，class 不含 "price" 字樣，
+    // 泛用的 [class*='price'] 選不到，這是先前金額一律顯示 0 元的原因（沒有 JSON-LD／
+    // og:price 可退回時完全抓不到價格）。IZPeQz 一樣是雜湊 class，蝦皮重新建置前端後
+    // 可能失效，但目前沒有更穩定的錨點可用。
+    "shopee.tw": {
+      name: "蝦皮購物",
+      buttons: ["button:has(svg path[d^='M19.469 1.262'])"],
+      roots: ["main", "[class*='product']"], title: ["h1"], price: [".IZPeQz", "[class*='price']"]
+    },
+    // 使用者提供的實際 PDP HTML 找到的結構：
+    // <div class="wish twc-flex ... wish-and-share"><button class="twc-relative twc-flex ...">
+    //   <svg><path fill="#454F5B" d="M12.174 4.43124..."/></svg></button></div>
+    // 按鈕本身只有 Tailwind 版面 class（沒有語意），但外層 wrapper 有 .wish / .wish-and-share，
+    // 全頁掃過沒有其他地方重複使用，比按鈕自己的 class 穩定，用它來 closest() 比較不會失效。
+    // 價格實測結構（同一段使用者提供的 HTML）：外層 <div class="price-container ...">
+    // 裡先是一個「86折」折扣徽章，之後才是 <div translate="no" class="...">$1,155</div>
+    // 這個真正售價。原本的 [class*='price'] 會選到最外層的 .price-container（它自己
+    // 的 class 就帶 "price"），textContent 會把「86折」跟「$1,155」全部串在一起，
+    // priceNumber() 從頭掃到的第一組數字會是「86」（折扣百分比），不是實際售價——
+    // 這是隱藏很深的抓錯價格風險，換成 translate="no"（酷澎用來標記不要被瀏覽器自動
+    // 翻譯的數字/金額內容，售價元素排在折扣徽章之後、單位價與劃線價之前，是頁面上第一個
+    // 符合這個屬性的元素）比較準。
+    "www.tw.coupang.com": {
+      name: "酷澎",
+      buttons: [".wish-and-share", ".wish-and-share button"],
+      roots: ["main", "[class*='product']"], title: ["h1"], price: ["[translate='no']", "[class*='price']"]
+    },
+    // 宜得利商品頁與相關商品輪播卡片共用同一顆按鈕：
+    // <button aria-label="toggleProductFavorite" class="btn-general"><img alt="加入收藏"></button>
+    // aria-label 是固定字串（非本地化文字），比對 class 或圖片 alt 更穩定。
+    // roots 多加 ".item"：相關商品輪播每張卡片是 <div class="item">，本身沒有 h1，
+    // 只有 ".heading" 放名稱，沒加的話輪播卡片點收藏會誤抓到整頁主商品的標題。
+    "www.nitori-net.tw": {
+      name: "宜得利家居",
+      buttons: ["button[aria-label='toggleProductFavorite']"],
+      roots: ["main", ".item", "[class*='product']"], title: ["h1", ".heading"], price: ["[class*='price']"]
+    },
+    // 特力屋商品頁的收藏（愛心）按鈕：<button class="... product__action__like ...">，
+    // 純圖示、沒有文字或 aria-label，BEM 風格的 class 名稱是目前可用的最穩定錨點。
+    "www.trplus.com.tw": {
+      name: "特力屋",
+      buttons: [".product__action__like"],
+      roots: ["main", "[class*='product']"], title: ["h1"], price: ["[class*='price']"]
+    },
+    // 淘寶／天貓 2025 年後共用同一套前端（2025SSR，id="SkuPanel_tbpcDetail_ssr2025"），
+    // 收藏按鈕結構兩站完全一樣：
+    // <div id="collectBtn"><i class="... icon-taobaoshoucang ..."></i><span class="text--BANTyNLW">收藏</span></div>
+    // #collectBtn 是少見的穩定 id（不是雜湊 class），兩站可以共用同一組規則。
+    // 標題／價格目前只看得到 body（沒看過 <head> 有沒有 JSON-LD/og 標籤可用），先退回用
+    // 觀察到的雜湊 class 前綴（[class*='xxx--']，不管後面接的雜湊字串是什麼），一樣
+    // 提醒：這類 class 改版後可能要重抓。
+    "detail.tmall.com": {
+      name: "天貓 Tmall",
+      buttons: ["#collectBtn"],
+      roots: ["main", "[class*='product']"],
+      title: ["h1", "[class*='mainTitle--']"],
+      price: ["[class*='highlightPrice--'] [class*='text--']", "[class*='price']"]
+    },
+    "item.taobao.com": {
+      name: "淘寶網",
+      buttons: ["#collectBtn"],
+      roots: ["main", "[class*='product']"],
+      title: ["h1", "[class*='mainTitle--']"],
+      price: ["[class*='highlightPrice--'] [class*='text--']", "[class*='price']"]
+    }
   };
 
-  function firstMatch(selectors, root) {
-    root = root || document;
-    for (const sel of selectors) {
+  const rule = SITE_RULES[location.hostname] || null;
+  const DOM_SELECTORS = {
+    cardRoot: rule ? rule.roots : ["main"],
+    cardFavoriteButton: rule ? rule.buttons : [],
+    pdpFavoriteButton: rule ? rule.buttons : []
+  };
+
+  const text = (el) => (el?.textContent || "").trim().replace(/\s+/g, " ");
+  const first = (selectors, root = document) => {
+    for (const selector of selectors || []) {
+      try { const found = root.querySelector(selector); if (found) return found; } catch (_) {}
+    }
+    return null;
+  };
+  const priceNumber = (value) => {
+    const match = String(value || "").match(/(?:NT\$|HK\$|\$)?\s*([\d,]+(?:\.\d+)?)/i);
+    return match ? Number(match[1].replace(/,/g, "")) : 0;
+  };
+
+  function jsonLdProduct() {
+    for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
       try {
-        const el = root.querySelector(sel);
-        if (el) return el;
-      } catch (e) {
-        /* 忽略無效選擇器 */
-      }
+        const raw = JSON.parse(script.textContent);
+        const queue = Array.isArray(raw) ? raw : [raw, ...(raw["@graph"] || [])];
+        const node = queue.find((item) => item && (item["@type"] === "Product" || item["@type"]?.includes?.("Product")));
+        if (!node) continue;
+        const offer = Array.isArray(node.offers) ? node.offers[0] : node.offers;
+        return {
+          name: node.name || "",
+          price: priceNumber(offer?.price || offer?.lowPrice),
+          image: Array.isArray(node.image) ? node.image[0] : (node.image?.url || node.image || ""),
+          articleNo: node.sku || node.mpn || node.productID || "",
+          url: node.url ? new URL(node.url, location.href).href : location.href,
+          source: rule?.name || location.hostname
+        };
+      } catch (_) {}
     }
     return null;
   }
 
-  function textOf(el) {
-    return el ? el.textContent.trim().replace(/\s+/g, " ") : "";
+  function metaProduct(root = document) {
+    const get = (key) => root.querySelector(`meta[property="${key}"],meta[name="${key}"]`)?.content || "";
+    const name = get("og:title") || text(first(rule?.title || ["h1"], root)) || document.title;
+    if (!name) return null;
+    return {
+      name: name.replace(/\s*[|｜].*$/, "").trim(),
+      price: priceNumber(get("product:price:amount") || get("og:price:amount") || text(first(rule?.price || [], root))),
+      image: get("og:image") || first(["img"], root)?.currentSrc || "",
+      articleNo: get("product:retailer_item_id") || location.pathname.split("/").filter(Boolean).pop() || "",
+      url: get("og:url") || location.href,
+      source: rule?.name || location.hostname
+    };
   }
 
-  /**
-   * 只取文字裡「第一組」數字（例如 "$69 / 44 公尺" 取 69，忽略後面的單位數字），
-   * 不要把整段文字裡所有數字全部串在一起 —— 之前就是把 69、44（單位）、79（劃線
-   * 舊價）三個數字併成 694479 的錯誤金額。
-   */
-  function parsePriceNumber(str) {
-    if (!str) return null;
-    const match = String(str).match(/\d[\d,]*(?:\.\d+)?/);
-    if (!match) return null;
-    const n = parseFloat(match[0].replace(/,/g, ""));
-    return isNaN(n) ? null : n;
+  function findRoot(button) {
+    for (const selector of rule?.roots || []) {
+      try { const found = button.closest(selector); if (found) return found; } catch (_) {}
+    }
+    return document;
   }
 
-  /** lazySizes 延遲載入圖片時，真正的圖片網址在 data-src，src 只是佔位圖 */
-  function imageUrlOf(imgEl) {
-    if (!imgEl) return "";
-    return imgEl.getAttribute("data-src") || imgEl.getAttribute("data-srcset") || imgEl.getAttribute("src") || "";
+  // 蝦皮／酷澎的貨號改成直接從網址規則抓，不要依賴 JSON-LD 的 sku/mpn 或猜 DOM——
+  // 蝦皮的 JSON-LD 沒有穩定對應的貨號欄位；酷澎同一個商品頁常常有多個 vendorItemId
+  // （不同賣家/規格），JSON-LD 裡的 sku 不一定是使用者當下實際選到的那一個，網址上的
+  // itemId 查詢參數才是當下這個瀏覽狀態真正對應的商品。
+  //   蝦皮：/任意名稱-i.<店家id>.<商品id> → 只取商品 id 本身，例如 "25579454125"
+  //   （原本連店家 id 一起取成 "i.50662979.25579454125"，但這一整段是 Shopee 內部組
+  //   網址/API 用的識別碼，不是拿來查詢的公開型號，使用者拿去查會查不到；商品 id
+  //   單獨拿出來還能組成 https://shopee.tw/product/店家id/商品id 這種可直接開啟的網址）
+  //   酷澎：?itemId=<商品id>（可能還有 vendorItemId） → 只取數字本身，例如 "478781420568588"
+  function articleNoFromUrl() {
+    if (location.hostname === "shopee.tw") {
+      const m = location.pathname.match(/i\.\d+\.(\d+)/);
+      return m ? m[1] : "";
+    }
+    if (location.hostname === "www.tw.coupang.com") {
+      return new URLSearchParams(location.search).get("itemId") || "";
+    }
+    // 淘寶／天貓的商品頁網址是 /item.htm?id=<商品id>，貨號不在路徑裡、在查詢參數裡，
+    // 跟直接抓 location.pathname 最後一段（會抓到 "item.htm"，沒有意義）不一樣。
+    if (location.hostname === "detail.tmall.com" || location.hostname === "item.taobao.com") {
+      return new URLSearchParams(location.search).get("id") || "";
+    }
+    return "";
   }
 
-  /**
-   * 貨號其實就藏在商品網址結尾：.../brimnes-art-90337700、.../saltsjobaden-spr-09627460
-   * 這種 "-art-{8碼數字}" 或 "-spr-{8碼數字}" 的格式，不管是舊系統還是新系統的卡片、
-   * 甚至完全找不到任何「貨號」DOM 元素時都能用，比在頁面上找特定 class 穩定很多。
-   * 官網貨號視覺上是 3-3-2 分組加句點（例如 606.227.94），這裡照這個格式組回去。
-   */
-  function formatArticleNo(digits) {
-    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 8)}`;
+  // 淘寶／天貓的商品原始標價是人民幣，但清單裡其他站全部都是新台幣，直接把人民幣數字
+  // 塞進去、貼著 NT$ 顯示是錯的（使用者實測回報：頁面顯示「¥211.15」，清單卻顯示成
+  // 「NT$211」，幣別根本不同，不是隨便換算一下就能用）。
+  //
+  // 這兩站的商品頁通常會自己算好「跨境送到台灣大約多少新台幣」的估價文字，例如
+  // 「券后约 TWD 1009起」——這才是真的 TWD 金額，不需要我們自己再抓匯率換算一次。
+  // 用掃整頁文字找「TWD 數字」這個模式，而不是靠 class 名稱去選那段文字：這頁的 class
+  // 幾乎都是建置雜湊（改版就換），但「TWD」這個貨幣代碼字樣穩定得多——上一版只靠
+  // rule.price 那組 class 選擇器，遇到頁面版型/選中的規格不同、選擇器剛好選不到的情況
+  // 就會整個 fallback 失敗、悄悄留著沒轉換的人民幣數字，這正是使用者這次回報「金額還是
+  // 不對」的原因。
+  //
+  // 少數不支援跨境直送台灣的商品才會完全沒有這段 TWD 估價文字，這時候真的沒有更好的
+  // 資料來源，只能退回用人民幣原價乘上一個寫死的粗略匯率——這個倍率不會自動跟著市場
+  // 匯率變動，只是「總比完全不換算好」的最後手段，不保證即時準確。
+  const CNY_TO_TWD_FALLBACK_RATE = 4.5;
+  function domPriceOverride() {
+    if (location.hostname !== "detail.tmall.com" && location.hostname !== "item.taobao.com") return 0;
+    const twdMatch = (document.body.innerText || "").match(/TWD\s*([\d,]+(?:\.\d+)?)/i);
+    if (twdMatch) return Number(twdMatch[1].replace(/,/g, ""));
+    const cnyPrice = priceNumber(text(first(rule?.price || [], document)));
+    return cnyPrice ? Math.round(cnyPrice * CNY_TO_TWD_FALLBACK_RATE) : 0;
   }
 
-  function extractArticleNoFromUrl(url) {
-    if (!url) return "";
-    const match = url.match(/-(?:art|spr)-(\d{8})(?:[/?#]|$)/);
-    if (!match) return "";
-    return formatArticleNo(match[1]);
+  // 套在 extractProduct()／extractCardProduct() 兩個對外入口的共用收尾：articleNoFromUrl()
+  // 只有蝦皮／酷澎／淘寶／天貓這幾站的網址會解析出東西，domPriceOverride() 只有淘寶／天貓
+  // 會解析出東西，其他站兩個都回傳空值、不會覆蓋任何東西，對其他站或這幾站的輪播卡片都
+  // 不影響——這幾站目前也還沒替輪播卡片設定專屬的 root 容器（不像宜得利那樣有 .item），
+  // 所以現況下不會有「覆蓋到別張卡片資料」的疑慮。
+  function withSiteOverrides(product) {
+    if (!product) return product;
+    const urlArticleNo = articleNoFromUrl();
+    if (urlArticleNo) product.articleNo = urlArticleNo;
+    const domPrice = domPriceOverride();
+    if (domPrice) product.price = domPrice;
+    return product;
   }
 
-  /**
-   * og:title／JSON-LD 的名稱常常是整頁 <title> 那種 SEO 格式：「商品名稱 | IKEA 線上購物」
-   * （TW）、「商品名稱 | IKEA 香港及澳門」（HK）。商品名稱本身不會真的含有直線符號「|」，
-   * 抓到這個模式（直線後面接 IKEA 開頭的文字）就整段砍掉 —— 不用管兩地字樣不一樣，也不用
-   * 猜以後會不會冒出第三種市場字樣，反正规则是「| IKEA ...」就一律視為網站字樣，不是商品名稱
-   * 的一部分。沒有這個模式的名稱（多數卡片擷取到的名稱）原封不動，不會被誤砍。
-   */
+  // 有些商品頁的 JSON-LD 是 ProductGroup（例如 momo）或單純沒填 offers，這種情況下
+  // jsonLdProduct() 抓得到名稱／圖片但價格會是 0；用 Open Graph／product meta 的價格
+  // 補上，避免明明頁面上有價格、清單裡卻顯示 0 元。貨號同理——PChome 的 JSON-LD Product
+  // 沒有填 sku/mpn/productID 任何一個欄位，之前只補了 price/image，articleNo 落空，
+  // 導致浮動按鈕表單開起來「商品貨號」欄位是空的；這裡改成三個欄位都補。
+  function extractProduct() {
+    const ld = jsonLdProduct();
+    const product = ld || metaProduct();
+    if (!product) return product;
+    if (ld && (!ld.price || !ld.image || !ld.articleNo)) {
+      const meta = metaProduct();
+      if (!ld.price && meta?.price) ld.price = meta.price;
+      if (!ld.image && meta?.image) ld.image = meta.image;
+      if (!ld.articleNo && meta?.articleNo) ld.articleNo = meta.articleNo;
+    }
+    return withSiteOverrides(product);
+  }
+  // 原本這裡只有 metaProduct(findRoot(button)) || extractProduct()：蝦皮／酷澎的
+  // cardRoot 設定裡有 "main"，而 <main> 幾乎一定是收藏按鈕的祖先節點，導致
+  // content-script.js 裡的 inKnownCard 判斷幾乎永遠是 true，主商品頁本身點收藏也會被
+  // 當成「卡片」處理、一路只走 metaProduct() 那條路徑、永遠碰不到 extractProduct() 裡
+  // 处理過的網址貨號覆蓋——這正是先前貨號還是顯示成整串網址編碼字串的原因。統一在這裡
+  // 補一次 withSiteOverrides()，不管走哪條路徑，這幾站最後都會套用同一套覆蓋規則。
+  // extractProduct() 內部已經呼叫過一次 withSiteOverrides()，這裡用 cardProduct 分開
+  // 判斷、只在真的走 metaProduct(findRoot(button)) 這條路徑時才自己補呼叫一次，避免
+  // 走 extractProduct() 那條路徑時被重複呼叫兩次（雖然兩次結果一樣，只是白白多算一次）。
+  function extractCardProduct(button) {
+    const cardProduct = metaProduct(findRoot(button));
+    return cardProduct ? withSiteOverrides(cardProduct) : extractProduct();
+  }
+  function extractProductFromButtonData(button) {
+    const name = button.dataset.name || button.dataset.productName;
+    if (!name) return null;
+    return { name, price: priceNumber(button.dataset.price), image: button.dataset.image || "", articleNo: button.dataset.item || button.dataset.sku || "", url: location.href, source: rule?.name || location.hostname };
+  }
+  // 各站商品頁網址規則不一：pchome 是 /prod/、momo 與宜得利是 /product/、酷澎是
+  // /products/（複數）、特力屋是 /p/、蝦皮則是 /任意名稱-i.<商店id>.<商品id> 沒有固定的路徑片段、
+  // 淘寶/天貓則是固定的 /item.htm（商品id 放在查詢參數 ?id= 裡，不在路徑上）。
+  function isProductPage() {
+    if (!rule) return false;
+    if (jsonLdProduct()) return true;
+    if (/\/prod(?:ucts?)?\//i.test(location.pathname)) return true;
+    if (/\/p\//i.test(location.pathname)) return true;
+    if (/-i\.\d+\.\d+(?:[/?#]|$)/.test(location.pathname)) return true;
+    if (/\/item\.htm/i.test(location.pathname)) return true;
+    return false;
+  }
+  // Planner（設計組合頁）跟一般商品頁是不同網域：planner.ikea.com.tw／planner.ikea.com.hk，
+  // 不在 SITE_RULES 裡（rule 會是 null），單純看 hostname 就能判斷，不需要靠規則表。
+  // 用 includes 而不是精確比對兩個網域字串，任何 planner.ikea.com.* 的地區變體都涵蓋到。
+  function isPlannerPage() {
+    return location.hostname.includes("planner.ikea.com");
+  }
+
+  // document.title 剛載入時可能還是 "IKEA Planner" 這類預設 app 名稱，或帶著
+  // " | IKEA 香港" 這種站台後綴，兩者都不是設計本身的名字，取名字之前先把這段濾掉。
   function stripSiteTitleSuffix(name) {
     if (!name) return name;
     return name.replace(/\s*\|\s*IKEA[^|]*$/i, "").trim();
   }
 
-  // ---------------------------------------------------------------------
-  // 商品清單卡片（PLP / 首頁輪播 / 搜尋結果）
-  // ---------------------------------------------------------------------
-
   /**
-   * 先試實測過的 .card.itemBlock／.itemBlock；找不到時（例如搜尋結果頁、「常搭配購買」
-   * 這類推薦商品輪播，可能用了不同的 Vue 元件、不同的 class 名稱，甚至巢狀層數更深），
-   * 改成從愛心按鈕往上逐層找，找到第一個「同時包含商品名稱與價格」的共同祖先容器。
-   * 層數上限拉到 20 層，因為輪播元件常常比一般卡片多包好幾層 slide/track 容器。
-   */
-  function findCardContainer(favoriteButtonEl) {
-    const known = favoriteButtonEl.closest(DOM_SELECTORS.cardRoot.join(","));
-    if (known) return known;
-
-    let el = favoriteButtonEl.parentElement;
-    for (let i = 0; i < 20 && el && el !== document.body; i++) {
-      const hasName = firstMatch(DOM_SELECTORS.cardName, el) || firstMatch(DOM_SELECTORS.cardNameFallback, el);
-      const hasPrice =
-        firstMatch(DOM_SELECTORS.cardOfferPrice, el) ||
-        firstMatch(DOM_SELECTORS.cardNormalPrice, el) ||
-        firstMatch(DOM_SELECTORS.cardPriceFallback, el);
-      if (hasName && hasPrice) return el;
-      el = el.parentElement;
-    }
-    return null;
-  }
-
-  function extractCardProduct(favoriteButtonEl) {
-    const card = findCardContainer(favoriteButtonEl);
-    if (!card) {
-      // 除錯用：在 DevTools Console 裡這行會印出一個可以展開/檢查的真實 DOM 節點，
-      // 遇到抓不到的版型時，把這個節點展開、右鍵「Copy > Copy outerHTML」回報，
-      // 比純文字描述更快定位問題。
-      console.warn("[IKEA 採購清單] 往上找了 20 層都找不到同時包含名稱與價格的容器，按鈕元素：", favoriteButtonEl);
-      return null;
-    }
-    const nameEl = firstMatch(DOM_SELECTORS.cardName, card) || firstMatch(DOM_SELECTORS.cardNameFallback, card);
-    const linkEl = firstMatch(DOM_SELECTORS.cardLink, card) || nameEl?.closest?.("a") || card.querySelector("a[href]");
-    const imgEl = firstMatch(DOM_SELECTORS.cardImage, card);
-    const offerEl = firstMatch(DOM_SELECTORS.cardOfferPrice, card) || firstMatch(DOM_SELECTORS.cardPriceFallback, card);
-    const normalEl = firstMatch(DOM_SELECTORS.cardNormalPrice, card);
-    let name = stripSiteTitleSuffix(textOf(nameEl));
-    if (!name) {
-      console.warn("[IKEA 採購清單] 找到容器了，但抓不到商品名稱文字，容器節點：", card);
-      return null;
-    }
-    // 品牌詞（GLOSTAD）跟中文描述（雙人座沙發，Knisa 藍色）在卡片上是兩個分開的元素，
-    // 只存品牌詞的話清單裡會看不出是什麼商品 —— 找得到描述就接在後面組成完整名稱。
-    const facts = textOf(firstMatch(DOM_SELECTORS.cardFacts, card));
-    // 「已經包含」的比對要不分大小寫：官網自己的名稱字串跟卡片上獨立的 facts 元素，
-    // 同一段描述有時候大小寫會不一樣（例如 "LED" vs "Led"），純字串 includes() 判斷
-    // 不出來，會把同一段描述重複接兩次（STOFTMOLN 這個商品就是這樣被使用者抓到的）。
-    if (facts && !name.toLowerCase().includes(facts.toLowerCase())) name = `${name}，${facts}`;
-
-    const price = parsePriceNumber(textOf(offerEl)) || parsePriceNumber(textOf(normalEl)) || 0;
-    // 缺貨商品的卡片，官網有時候不會渲染一顆正常的 <a href> 連結（點卡片本身沒有可點的
-    // 商品頁連結），這種情況下 linkEl 會是 null，也找不到 -art-/-spr- 網址可以解析貨號。
-    // 除了正常的 <a href>，也試著找常見的「非 <a> 但用 data 屬性存連結」的寫法（JS 路由
-    // 卡片常見的做法），儘量多一個機會拿到貨號。
-    let url = linkEl ? linkEl.getAttribute("href") || "" : "";
-    if (!url) {
-      const dataLinkEl = card.querySelector("[data-href],[data-url],[data-link],[data-product-url]");
-      if (dataLinkEl) {
-        url =
-          dataLinkEl.getAttribute("data-href") ||
-          dataLinkEl.getAttribute("data-url") ||
-          dataLinkEl.getAttribute("data-link") ||
-          dataLinkEl.getAttribute("data-product-url") ||
-          "";
-      }
-    }
-    if (url && !/^https?:\/\//.test(url)) url = new URL(url, location.origin).href;
-    const finalUrl = url || location.href;
-    // 商品清單／輪播卡片上不會顯示貨號文字，但網址裡藏著，見 extractArticleNoFromUrl()
-    const articleNo = extractArticleNoFromUrl(finalUrl);
-    if (!articleNo) {
-      // 除錯用：貨號抓不到最常見的原因是這張卡片根本沒有可用的商品連結（例如缺貨商品），
-      // 印出卡片節點方便直接在 DevTools 展開檢查，比純文字描述更快定位問題。
-      console.warn("[IKEA 採購清單] 抓到名稱/價格，但這張卡片沒有找到含貨號格式的連結，貨號會是空的。卡片節點：", card, "目前找到的網址：", finalUrl);
-    }
-    return { name, price, image: imageUrlOf(imgEl), articleNo, url: finalUrl };
-  }
-
-  // ---------------------------------------------------------------------
-  // 單一商品頁（PDP）：JSON-LD -> Open Graph -> DOM 三層備援
-  // ---------------------------------------------------------------------
-
-  function readJsonLdProduct() {
-    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-    for (const script of scripts) {
-      try {
-        const data = JSON.parse(script.textContent);
-        const candidates = Array.isArray(data) ? data : [data, ...(data["@graph"] || [])];
-        for (const node of candidates) {
-          if (!node) continue;
-          const type = node["@type"];
-          const isProduct = type === "Product" || (Array.isArray(type) && type.includes("Product"));
-          if (!isProduct) continue;
-          const offers = Array.isArray(node.offers) ? node.offers[0] : node.offers;
-          return {
-            name: node.name || null,
-            image: Array.isArray(node.image) ? node.image[0] : node.image || null,
-            price: offers ? parsePriceNumber(offers.price) : null,
-            articleNo: node.sku || node.mpn || null
-          };
-        }
-      } catch (e) {
-        /* 忽略解析失敗的 JSON-LD 區塊 */
-      }
-    }
-    return null;
-  }
-
-  function readOpenGraphProduct() {
-    const get = (name) => {
-      const el = document.querySelector(`meta[property='${name}']`) || document.querySelector(`meta[name='${name}']`);
-      return el ? el.getAttribute("content") : null;
-    };
-    const title = get("og:title");
-    const image = get("og:image");
-    const price = get("product:price:amount") || get("og:price:amount");
-    if (!title && !image && !price) return null;
-    return { name: title, image, price: parsePriceNumber(price), articleNo: null };
-  }
-
-  function readDomProduct() {
-    const nameEl = firstMatch(DOM_SELECTORS.productTitle);
-    const priceEl = firstMatch(DOM_SELECTORS.price);
-    const articleEl = firstMatch(DOM_SELECTORS.articleNumber);
-    const imgEl = firstMatch(DOM_SELECTORS.productImage);
-    return {
-      name: textOf(nameEl) || null,
-      image: imgEl ? imageUrlOf(imgEl) : null,
-      price: parsePriceNumber(textOf(priceEl)),
-      articleNo: textOf(articleEl) || null
-    };
-  }
-
-  /**
-   * 缺貨商品的 PDP 有兩個地方會失效：(1) JSON-LD 的 Product/價格資訊常常缺貨時就不生成，
-   * (2) isProductPage() 原本用「有沒有加入購物車按鈕」判斷是不是商品頁，缺貨時加入購物車
-   * 按鈕會整個被換成「到貨通知我」（.notifyStock），導致 isProductPage() 誤判成「不是
-   * 商品頁」，連 extractProduct() 都不會被呼叫，直接掉進卡片擷取邏輯（找不到卡片容器，
-   * 整個抓取失敗）。但 .addFavorites 收藏按鈕本身──不管缺不缺貨都在──直接帶著
-   * data-item（貨號數字，未格式化）／data-name（品牌詞，例如 "RISBYN/HAVSDJUP"）／
-   * data-price（純數字價格）這三個屬性，缺貨時 data-price 可能是最後一次還在賣時的價格
-   * （非即時），但貨號和名稱不受影響。這條路徑直接讀被點擊的按鈕本身，完全不需要猜「這是
-   * 不是商品頁」，也不管缺不缺貨，比原本 JSON-LD/OG/DOM 三層擷取更可靠，優先試這個。
-   */
-  function extractProductFromButtonData(btn) {
-    const itemId = btn.getAttribute("data-item");
-    if (!itemId) return null;
-    let name = stripSiteTitleSuffix(btn.getAttribute("data-name") || "");
-    if (!name) return null;
-    const facts = textOf(firstMatch(DOM_SELECTORS.productFacts));
-    if (facts && !name.toLowerCase().includes(facts.toLowerCase())) name = `${name}，${facts}`;
-    const price = parsePriceNumber(btn.getAttribute("data-price")) || 0;
-    const articleNo = /^\d{8}$/.test(itemId) ? formatArticleNo(itemId) : "";
-    const imgEl = firstMatch(DOM_SELECTORS.productImage);
-    return { name, image: imgEl ? imageUrlOf(imgEl) : "", price, articleNo, url: location.href.split("?")[0] };
-  }
-
-  function extractProduct() {
-    const sources = [readJsonLdProduct(), readOpenGraphProduct(), readDomProduct()].filter(Boolean);
-    const merged = { name: null, image: null, price: null, articleNo: null };
-    for (const key of Object.keys(merged)) {
-      for (const src of sources) {
-        if (src[key] !== null && src[key] !== undefined && src[key] !== "") {
-          merged[key] = src[key];
-          break;
-        }
-      }
-    }
-    if (!merged.name) return null;
-
-    // og:title／JSON-LD 名稱常常帶「| IKEA 線上購物」「| IKEA 香港及澳門」這種網站字樣，
-    // 先砍掉再做後面的描述合併判斷，不然合併判斷可能會被那段字樣干擾。
-    let name = stripSiteTitleSuffix(merged.name);
-
-    // 不管名稱是從哪個來源抓到的，如果頁面上另外找得到描述文字（例如「三人座沙發，
-    // Silkeryd 灰綠色」），就接在後面組成完整名稱，避免清單裡只顯示光禿禿的品牌詞。
-    const facts = textOf(firstMatch(DOM_SELECTORS.productFacts));
-    // 同一段描述文字在 og:title/JSON-LD 名稱裡跟獨立的 facts 元素裡，大小寫可能不一致
-    // （例如 "LED" vs "Led"），比對要不分大小寫，不然會誤判成「還沒包含」重複接兩次。
-    if (facts && !name.toLowerCase().includes(facts.toLowerCase())) name = `${name}，${facts}`;
-
-    const pageUrl = location.href.split("?")[0];
-    // JSON-LD 的 sku／頁面上的貨號元素都可能抓不到或改版失效，網址裡的 -art-/-spr- 編號
-    // 是最後一道防線，見 extractArticleNoFromUrl()
-    return {
-      name,
-      image: merged.image || "",
-      price: merged.price || 0,
-      articleNo: merged.articleNo || extractArticleNoFromUrl(pageUrl),
-      url: pageUrl
-    };
-  }
-
-  function isProductPage() {
-    if (readJsonLdProduct()) return true;
-    if (firstMatch(DOM_SELECTORS.addToCartTrigger)) return true;
-    return false;
-  }
-
-  // ---------------------------------------------------------------------
-  // IKEA Planner（planner.ikea.com.tw／.hk，設計組合，例如 BILLY 系統櫃規劃）
-  // ---------------------------------------------------------------------
-  //
-  // 這是完全不同的重量級 3D 應用（下載主程式檔案確認是用 Babylon.js WebGL 引擎蓋的），
-  // 跟主站不是同一套系統，畫面主要靠 WebGL 畫，不是一般 DOM，也沒有找到可靠的原生
-  // 「加入收藏」按鈕可以攔截。反查過它的 JS bundle：
-  //   - 找到一個內部的 dexf API，可以用設計代碼換回完整零件清單（品號＋數量），
-  //     但那組 API 需要一組寫死在程式碼裡的私有 API key，沒有真實瀏覽器可以驗證
-  //     呼叫方式會不會被擋、金鑰會不會過期，所以沒有直接串接。
-  //   - 確認 document.title 會被這個 app 動態更新（用類似 react-helmet 的機制），
-  //     比亂猜 DOM 選擇器可靠，所以名稱優先用它。
-  // 金額沒辦法自動抓，固定回傳 0，讓使用者加入清單後自己點金額手動輸入
-  // （面板的金額欄位支援點擊編輯）。
-
-  function isPlannerPage() {
-    return location.hostname.includes("planner.ikea.com");
-  }
-
-  /**
-   * 從實際拿到的 Planner 頁面 HTML 才發現：畫面上方 header（`[data-testid="header-total-price"]`）
-   * 和「設計總覽」摘要畫面（`[data-testid="summary-page"]`）都帶著一個 data-shoppingitems／
-   * data-summary-shoppingitems attribute，內容是這個設計目前包含的品項 JSON，例如：
-   * `[{"id":"00477356","type":"ART","quantity":2},{"id":"80477338","type":"ART","quantity":1}]`。
-   * 這兩顆 div 本身是一般的 React 渲染 light DOM（不是包在 Web Component 的 shadow root
-   * 裡面），可以直接 querySelector 讀到，不需要理解 Babylon.js 場景或呼叫任何 API。
-   * 用來把品項數量算進去，讓加入清單的名稱看得出這個設計包含幾件商品，不是只顯示一顆
-   * 沒有內容的「設計組合」。單一品項的價格/名稱仍然拿不到，這裡只算得出總件數。
+   * Planner 是完全不同的重量級 3D 應用（Babylon.js WebGL 引擎），不是一般 DOM 頁面，
+   * 沒有原生「加入收藏」按鈕可以攔截，商品資料也没辦法從 JSON-LD/meta 抓。
+   * 從實際頁面 HTML 找到：畫面上方 header（[data-testid="header-total-price"]）跟
+   * 「設計總覽」摘要畫面（[data-testid="summary-page"]）都帶著 data-shoppingitems／
+   * data-summary-shoppingitems attribute，內容是這個設計目前的品項 JSON，例如
+   * `[{"id":"00477356","type":"ART","quantity":2}]`。這兩顆 div 是一般 React light DOM
+   * （沒有包在 shadow root 裡），可以直接 querySelector 讀到。用來把品項數量算進去，
+   * 讓加入清單的名稱看得出這個設計包含幾件商品；單一品項的價格/名稱仍然拿不到，
+   * 這裡只算得出總件數。
    */
   function countPlannerParts() {
     const el = document.querySelector("[data-shoppingitems], [data-summary-shoppingitems]");
@@ -394,14 +320,14 @@
 
   /**
    * 設計代碼在網址 hash 裡：.../?vpcSource=clipboard#/vpc/32GQ6TK → 32GQ6TK。
-   * 存起來的 url 就是目前完整網址（含 hash），清單裡點名稱會直接導覽回這個設計。
    *
-   * 實測發現「設計總覽」畫面的 hash 是 `#/summary`，完全沒有 `/vpc/{代碼}`（用 email
-   * 連結直接開啟設計總覽時尤其明顯，從頭到尾都不會經過帶 vpc 代碼的 3D 編輯畫面）——
-   * 這種情況不再直接放棄，改成只要畫面上還找得到 data-shoppingitems（見
-   * countPlannerParts()）就當作「有效」，貨號欄位留空（不是編造一個假代碼，避免不同
-   * 設計互相被誤判成同一件商品）。已知限制：這種情況下商品連結只會連回這個總覽頁，
-   * 不是特定設計的深連結。只有網址跟畫面上都完全找不到任何線索時才真的判定放棄。
+   * 實測發現「設計總覽」畫面的 hash 是 #/summary，完全沒有 /vpc/{代碼}（例如
+   * https://planner.ikea.com.hk/addon-app/storageone/besta/web/latest/hk/zh/?...#/summary
+   * 這種從 email/分享連結直接開啟總覽頁的情況，從頭到尾都不會經過帶 vpc 代碼的 3D
+   * 編輯畫面）——這種情況不直接放棄，只要畫面上還找得到 data-shoppingitems（見
+   * countPlannerParts()）就當作「有效」，貨號欄位留空（不編造假代碼，避免不同設計被
+   * 誤判成同一件商品）。已知限制：這種情況下商品連結只會連回這個總覽頁，不是特定設計
+   * 的深連結。只有網址跟畫面上都完全找不到任何線索時才真的判定放棄（回傳 null）。
    */
   function extractPlannerDesign() {
     const match = location.hash.match(/\/vpc\/([A-Z0-9]+)/i);
@@ -411,8 +337,8 @@
 
     let name = stripSiteTitleSuffix(document.title || "");
     // document.title 剛載入時可能還是預設的 app 名稱，還沒被換成跟這個設計相關的標題，
-    // 這種情況退回用網址路徑裡的產品線代號（例如 /addon-app/storageone/billy/ 裡的
-    // billy）組一個看得出來是哪個設計的名稱。
+    // 這種情況退回用網址路徑裡的產品線代號（例如 /addon-app/storageone/besta/ 裡的
+    // besta）組一個看得出來是哪個設計的名稱。
     const looksGeneric = !name || /planner|storageone|addon-app/i.test(name);
     if (looksGeneric) {
       const productLineMatch = location.pathname.match(/\/addon-app\/[^/]+\/([^/]+)\//i);
@@ -421,17 +347,8 @@
     }
     if (partsCount) name += `（共 ${partsCount} 件商品）`;
 
-    return { name, price: 0, image: "", articleNo: vpcCode, url: location.href };
+    return { name, price: 0, image: "", articleNo: vpcCode, url: location.href, source: "IKEA Planner" };
   }
 
-  global.__ikeaAdapter = {
-    extractProduct,
-    extractProductFromButtonData,
-    extractCardProduct,
-    isProductPage,
-    isPlannerPage,
-    extractPlannerDesign,
-    countPlannerParts,
-    DOM_SELECTORS
-  };
+  global.__roomlistAdapter = { SITE_RULES, DOM_SELECTORS, extractProduct, extractCardProduct, extractProductFromButtonData, isProductPage, isPlannerPage, extractPlannerDesign, countPlannerParts };
 })(window);

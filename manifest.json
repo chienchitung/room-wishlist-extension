@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "IKEA 採購清單小幫手",
-  "short_name": "IKEA清單",
-  "version": "0.2.0",
-  "description": "在 IKEA 台灣／香港官網收藏喜愛商品、依空間整理採購清單、自動計算金額，並可匯出 PDF 或 Email 寄送清單，不需登入即可使用。",
+  "name": "RoomList 空間採購清單",
+  "short_name": "RoomList",
+  "version": "0.3.0",
+  "description": "跨電商收藏家居商品，依空間整理採購清單、預算與分享內容。資料只儲存在本機。",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -17,7 +17,7 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
-    "default_title": "開啟 IKEA 採購清單"
+    "default_title": "開啟 RoomList 空間採購清單"
   },
   "background": {
     "service_worker": "background/service-worker.js"
@@ -27,7 +27,15 @@
     "https://www.ikea.com.tw/*",
     "https://www.ikea.com.hk/*",
     "https://planner.ikea.com.tw/*",
-    "https://planner.ikea.com.hk/*"
+    "https://planner.ikea.com.hk/*",
+    "https://24h.pchome.com.tw/*",
+    "https://www.momoshop.com.tw/*",
+    "https://shopee.tw/*",
+    "https://www.tw.coupang.com/*",
+    "https://www.nitori-net.tw/*",
+    "https://www.trplus.com.tw/*",
+    "https://detail.tmall.com/*",
+    "https://item.taobao.com/*"
   ],
   "content_scripts": [
     {
@@ -35,7 +43,15 @@
         "https://www.ikea.com.tw/*",
         "https://www.ikea.com.hk/*",
         "https://planner.ikea.com.tw/*",
-        "https://planner.ikea.com.hk/*"
+        "https://planner.ikea.com.hk/*",
+        "https://24h.pchome.com.tw/*",
+        "https://www.momoshop.com.tw/*",
+        "https://shopee.tw/*",
+        "https://www.tw.coupang.com/*",
+        "https://www.nitori-net.tw/*",
+        "https://www.trplus.com.tw/*",
+        "https://detail.tmall.com/*",
+        "https://item.taobao.com/*"
       ],
       "js": [
         "content/site-adapter.js",
