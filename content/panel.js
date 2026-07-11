@@ -299,7 +299,7 @@
           <div class="total-caption">實際金額以官網結帳頁顯示為準，可能因活動或門市庫存調整</div>
           <button class="btn btn-primary" id="btnPdf">${ICONS.pdf}匯出 PDF</button>
           <button class="btn btn-outline" id="btnEmail" style="width:100%">${ICONS.mail}Email 寄送清單內容</button>
-          <p class="disclaimer">本工具為非官方小幫手，與 IKEA 官方無關</p>
+          <p class="disclaimer">本工具由第三方獨立開發，非 IKEA 官方服務。</p>
         </div>
       </aside>
       <div class="modal-scrim" id="settingsScrim">
@@ -1127,7 +1127,7 @@
         <div class="backup-label">◆ 備份資料 —— 清單如果不小心被刪除，整段複製下面這串文字，貼到擴充功能設定裡的「從備份還原」即可救回：</div>
         <div class="backup-text">${escapeHtml(buildBackupText())}</div>
       </div>
-      <div class="footer-note">本清單由非官方小幫手產生，與 IKEA 官方無關</div>
+      <div class="footer-note">本工具由第三方獨立開發，非 IKEA 官方服務。</div>
       </body></html>`;
   }
 
