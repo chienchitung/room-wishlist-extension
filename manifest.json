@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "IKEA 採購清單小幫手",
+  "short_name": "IKEA清單",
+  "version": "0.2.0",
+  "description": "在 IKEA 台灣／香港官網收藏喜愛商品、依空間整理採購清單、自動計算金額，並可匯出 PDF 或 Email 寄送清單，不需登入即可使用。",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "開啟 IKEA 採購清單"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.ikea.com.tw/*",
+    "https://www.ikea.com.hk/*",
+    "https://planner.ikea.com.tw/*",
+    "https://planner.ikea.com.hk/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.ikea.com.tw/*",
+        "https://www.ikea.com.hk/*",
+        "https://planner.ikea.com.tw/*",
+        "https://planner.ikea.com.hk/*"
+      ],
+      "js": [
+        "content/site-adapter.js",
+        "content/storage.js",
+        "content/panel.js",
+        "content/content-script.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}
