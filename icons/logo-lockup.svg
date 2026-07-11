@@ -1,15 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 72" role="img" aria-labelledby="lockup-title">
   <title id="lockup-title">RoomList</title>
-  <g transform="translate(0,4)">
-    <rect width="64" height="64" rx="16" fill="#FFFFFF" stroke="#EDE7DA" stroke-width="1.5"/>
-    <g transform="translate(7,7) scale(.390625)">
-      <path d="M21 57 59 27c3-2.4 7-2.4 10 0l38 30v43c0 4.4-3.6 8-8 8H29c-4.4 0-8-3.6-8-8V57Z"
-            fill="none" stroke="#C6A668" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M62 52v52M25 76h37M62 84h41"
-            fill="none" stroke="#2A2E2E" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M82.5 52.5c-5.6-6-14-1.6-14 5.4 0 6.2 5.4 10.5 14 16.2 8.6-5.7 14-10 14-16.2 0-7-8.4-11.4-14-5.4Z"
-            fill="#2A2E2E"/>
+  <g transform="translate(0,4) scale(.5)">
+    <rect width="128" height="128" rx="28" fill="#FFFFFF"/>
+    <rect x="8" y="9" width="112" height="110" rx="25" fill="none" stroke="#C6A668" stroke-width="3"/>
+    <path d="M15 19 35 35h85M35 35v59M15 108l20-14h12M94 94h26" fill="none" stroke="#C6A668" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(-7.8 -12.64) scale(1.12)">
+      <path d="M38 52h6l6 32h39L96 59H47" fill="none" stroke="#464A47" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="57" cy="92" r="5.2" fill="#464A47"/>
+      <circle cx="84" cy="92" r="5.2" fill="#464A47"/>
+      <path d="M52 58h18l10 10-10 10H52a4 4 0 0 1-4-4V62a4 4 0 0 1 4-4Z" fill="#B8BBB7"/>
+      <path d="M60 49h23l12 12-12 12H60a5 5 0 0 1-5-5V54a5 5 0 0 1 5-5Z" fill="#5B605C"/>
+      <path d="M69 55.5c-4-4.3-10.1-1.1-10.1 4.1 0 4.5 3.9 7.6 10.1 11.7 6.2-4.1 10.1-7.2 10.1-11.7 0-5.2-6.1-8.4-10.1-4.1Z" fill="#FFFFFF"/>
     </g>
   </g>
-  <text x="80" y="47" font-family="Avenir Next, 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif" font-size="34" font-weight="700" fill="#2A2E2E">RoomList</text>
+  <text x="80" y="47" font-family="Avenir Next, 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif" font-size="34" font-weight="700" fill="#464A47">RoomList</text>
 </svg>

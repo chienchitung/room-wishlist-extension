@@ -35,7 +35,9 @@
     "https://www.nitori-net.tw/*",
     "https://www.trplus.com.tw/*",
     "https://detail.tmall.com/*",
-    "https://item.taobao.com/*"
+    "https://item.taobao.com/*",
+    "https://www.hoihome.tw/*",
+    "https://www.mrliving.com.tw/*"
   ],
   "content_scripts": [
     {
@@ -51,7 +53,9 @@
         "https://www.nitori-net.tw/*",
         "https://www.trplus.com.tw/*",
         "https://detail.tmall.com/*",
-        "https://item.taobao.com/*"
+        "https://item.taobao.com/*",
+        "https://www.hoihome.tw/*",
+        "https://www.mrliving.com.tw/*"
       ],
       "js": [
         "content/site-adapter.js",

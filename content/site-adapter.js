@@ -21,18 +21,42 @@
     //   <i data-regression="prod_icon_add2Wish">/i><span data-regression="prod_txt_add2Wish">追蹤</span></span></button></div>
     // 按鈕文字是「追蹤」不是「收藏」；data-regression 是 PChome 內部迴歸測試用的錨點，
     // 比 class（會隨改版變動）穩定，外層 .c-compoundBtnTool--track 則涵蓋整個可點擊熱區。
+    //
+    // 賣場列表頁（/store/<賣場代碼>）是不同版型（V2 卡片），實測（headless Chrome 渲染）
+    // 找到每張卡片的結構：<div class="c-prodInfoV2 c-prodInfoV2--gridCard">
+    //   <a class="c-prodInfoV2__link" href="/prod/<商品代碼>?...">(圖片/名稱 h3[data-regression=
+    //   store_prodName]/價格 div[data-regression=store_prodPrice])</a>
+    //   <div class="c-prodInfoV2__otherFunctions">(收藏鈕 data-regression=store_addToWish／
+    //   購物車鈕)</div>
+    // </div>
+    // 收藏鈕跟名稱/價格/連結不在同一個 <a> 底下（是手足關係），roots 要用外層
+    // .c-prodInfoV2 才能同時涵蓋兩邊；[class*='product'] 在這裡不會命中（PChome 這裡的
+    // class 都是 "c-prodInfoV2" 這種縮寫 "prod"，不含完整 "product" 字樣），拿掉沒有影響。
     "24h.pchome.com.tw": {
       name: "PChome 24h",
-      buttons: [".c-compoundBtnTool--track", "[data-regression='prod_icon_add2Wish']", "[data-regression='prod_txt_add2Wish']"],
-      roots: ["main", "[class*='product']"], title: ["h1"], price: ["[class*='price']"]
+      buttons: [".c-compoundBtnTool--track", "[data-regression='prod_icon_add2Wish']", "[data-regression='prod_txt_add2Wish']", "[data-regression='store_addToWish']"],
+      roots: [".c-prodInfoV2", "main"],
+      title: ["h1", "[data-regression='store_prodName']"],
+      price: ["[data-regression='store_prodPrice']", "[class*='price']"]
     },
     // momo 商品頁的按鈕文字／aria-label 是「加入追蹤」不是「收藏」，緊鄰在「放入購物車」
     // 按鈕右邊：<button aria-label="加入追蹤">...</button>。aria-label 直接掛在按鈕本身，
     // 點擊時不管落在圖示或文字上，往上找都能命中同一顆按鈕。
+    //
+    // 分類列表頁是完全不同的新版前端（Tailwind 風格的 "mu-" 前綴 class，跟 PDP 不通用），
+    // 收藏鈕 aria-label 也不一樣，是「追蹤商品」。每張卡片沒有穩定的外層 class，但卡片
+    // 本身帶一個內部覆蓋連結 <a data-testid="goods-card-overlay" href=".../GoodsDetail.jsp
+    // ?i_code=<商品id>">，用 :has() 選出「有這顆覆蓋連結當直接子元素」的 div 當卡片邊界。
+    // 名稱在 [data-testid="title"]。價格比較特殊：[data-testid="market-price"] 實測是
+    // 「原價」（劃線價），不是實際售價——真正售價是它前一個手足元素（沒有 class 可選，
+    // 只能在 cardOverrides 用 previousElementSibling 抓），這裡 rule.price 的
+    // [class*='price'] 純粹是 PDP 用的備援，列表卡片不會用到。
     "www.momoshop.com.tw": {
       name: "momo 購物網",
-      buttons: ["button[aria-label='加入追蹤']", "button[aria-label*='追蹤']"],
-      roots: ["main", "#productForm", "[class*='product']"], title: ["h1", ".prdName"], price: [".price", "[class*='price']"]
+      buttons: ["button[aria-label='加入追蹤']", "button[aria-label*='追蹤']", "button[aria-label='追蹤商品']"],
+      roots: ["div:has(>[data-testid='goods-card-overlay'])", "main", "#productForm"],
+      title: ["h1", ".prdName", "[data-testid='title']"],
+      price: [".price", "[class*='price']"]
     },
     // 使用者提供的實際 PDP HTML 找到的結構（在商品圖片下方、分享按鈕旁邊）：
     // <button class="w2JMKY"><svg><path d="M19.469 1.262c-5.284-1.53-7.47..." stroke="#FF424F".../></svg>
@@ -63,27 +87,71 @@
     // 這是隱藏很深的抓錯價格風險，換成 translate="no"（酷澎用來標記不要被瀏覽器自動
     // 翻譯的數字/金額內容，售價元素排在折扣徽章之後、單位價與劃線價之前，是頁面上第一個
     // 符合這個屬性的元素）比較準。
+    // 這次多站測試實測酷澎搜尋／分類列表頁（真的抓到頁面，不是被擋）發現卡片本身完全
+    // 沒有收藏愛心可以點——每張卡片只有圖片/名稱/價格/星等，`.wish-and-share` 這顆按鈕
+    // 只存在單一商品頁，官網自己就沒有在列表頁提供「加入收藏」的入口，不是我們選擇器沒
+    // 抓到。列表頁沒有卡片層級的按鈕可攔截，roots 也就不需要任何「列表卡片」專用的選擇器；
+    // 拿掉 [class*='product'] 只影響單一商品頁，且只有風險沒有好處（同一類「命中不相干的
+    // wrapper」問題這次在其他四站都各自出現過一次），保守起見拿掉。
     "www.tw.coupang.com": {
       name: "酷澎",
       buttons: [".wish-and-share", ".wish-and-share button"],
-      roots: ["main", "[class*='product']"], title: ["h1"], price: ["[translate='no']", "[class*='price']"]
+      roots: ["main"],
+      title: ["h1"],
+      price: ["[translate='no']", "[class*='price']"]
     },
-    // 宜得利商品頁與相關商品輪播卡片共用同一顆按鈕：
+    // 宜得利商品頁、相關商品輪播卡片、跟分類列表頁都共用同一顆按鈕：
     // <button aria-label="toggleProductFavorite" class="btn-general"><img alt="加入收藏"></button>
     // aria-label 是固定字串（非本地化文字），比對 class 或圖片 alt 更穩定。
-    // roots 多加 ".item"：相關商品輪播每張卡片是 <div class="item">，本身沒有 h1，
-    // 只有 ".heading" 放名稱，沒加的話輪播卡片點收藏會誤抓到整頁主商品的標題。
+    // roots 多加 ".item"：分類列表頁／輪播卡片每張都是 <div class="item">，本身沒有 h1，
+    // 只有 ".heading" 放名稱，沒加的話點收藏會誤抓到整頁主商品的標題。
+    //
+    // 這裡不放 [class*='product']：實測單一商品頁（headless Chrome 渲染）發現按鈕往上
+    // 數第 10 層祖先剛好是 <div class="product-page">——這只是「這是一個商品詳情頁」的
+    // 版面外層標記，不是任何一張卡片，但 [class*='product'] 照樣會命中它的 class 帶
+    // "product" 字樣，導致 findRoot() 誤判成「找到一個特定卡片」，extractCardProduct()
+    // 因此不會用 isPageLevelRoot() 那條退回 extractProduct()（JSON-LD 優先）的路徑，改用
+    // metaProduct(那層 div) 硬掃 DOM——跟同一頁另一條路徑（懸浮按鈕輪詢用的
+    // extractProduct()，一樣是 JSON-LD 優先）挑出來的名稱/貨號不一致，導致
+    // sameProduct() 比對失敗：使用者在商品頁用官網原生愛心加入清單後，懸浮的「加入採購
+    // 清單」按鈕文字沒有跟著變成「已在採購清單中」，因為兩條路徑各自認得不同的貨號。
+    // 拿掉 [class*='product'] 後，商品頁的 main／.item 都不存在，findRoot() 會退回
+    // document，isPageLevelRoot() 判斷為真，兩條路徑統一都走 extractProduct()（JSON-LD
+    // 優先），貨號才會一致。分類列表頁不受影響：.item 本身就是離按鈕最近、也是唯一會命中
+    // 的選擇器，不需要 [class*='product'] 這個退回層。
+    //
+    // price 改成 .sale-price 優先：實測分類列表頁的 .price 容器結構是
+    // <div class="price"><div class="sale-price">$449</div><div class="original-price">
+    // 499</div></div>，兩個數字中間沒有分隔字元，原本抓整個 .price 的 textContent 會
+    // 變成「$449499」，priceNumber() 解析成 449499（使用者截圖回報清單裡金額顯示成
+    // 「NT$449,499」就是這樣來的）。.sale-price 是目前顯示的售價（不管是不是真的在打折，
+    // 每個商品都有這個 class），直接選它本身可以避免跟 .original-price 的文字黏在一起。
     "www.nitori-net.tw": {
       name: "宜得利家居",
       buttons: ["button[aria-label='toggleProductFavorite']"],
-      roots: ["main", ".item", "[class*='product']"], title: ["h1", ".heading"], price: ["[class*='price']"]
+      roots: ["main", ".item"],
+      title: ["h1", ".heading"],
+      price: [".sale-price", "[class*='price']"]
     },
     // 特力屋商品頁的收藏（愛心）按鈕：<button class="... product__action__like ...">，
     // 純圖示、沒有文字或 aria-label，BEM 風格的 class 名稱是目前可用的最穩定錨點。
+    //
+    // 分類列表頁（實測 headless Chrome 渲染）發現一個很隱蔽的問題：roots 裡原本的
+    // [class*='product'] 會直接命中按鈕自己（按鈕自己的 class 就帶 "product__action__like"，
+    // closest() 會先檢查元素自己再往上找祖先），導致 findRoot() 永遠直接回傳按鈕本身，
+    // 完全沒機會往上找到真正的卡片——這跟 mrliving／hoihome 那次「[class*='product'] 搶先
+    // 命中太近的 wrapper」是同一類問題的另一種變形（這次是命中「自己」而不是「太近的祖先」）。
+    // 列表卡片整張是一顆 <a data-id-id="prodlist" data-id-item="<商品代碼>"
+    // href="https://www.trplus.com.tw/p/<商品代碼>?...">，用 [data-id-id='prodlist']
+    // （按鈕自己的 data-id-id 是 "addToWishlist"，值不同，不會跟卡片本身搞混）當卡片邊界。
+    // 名稱是 <p class="tlw-txt-zh-head-7 ...">商品名稱</p>，價格 class 帶 "tlw-txt-price-2"
+    // （[class*='price'] 抓得到，不用另外加）。
     "www.trplus.com.tw": {
       name: "特力屋",
       buttons: [".product__action__like"],
-      roots: ["main", "[class*='product']"], title: ["h1"], price: ["[class*='price']"]
+      roots: ["[data-id-id='prodlist']", "main"],
+      title: ["h1", "p.tlw-txt-zh-head-7"],
+      price: ["[class*='price']"]
     },
     // 淘寶／天貓 2025 年後共用同一套前端（2025SSR，id="SkuPanel_tbpcDetail_ssr2025"），
     // 收藏按鈕結構兩站完全一樣：
@@ -92,19 +160,87 @@
     // 標題／價格目前只看得到 body（沒看過 <head> 有沒有 JSON-LD/og 標籤可用），先退回用
     // 觀察到的雜湊 class 前綴（[class*='xxx--']，不管後面接的雜湊字串是什麼），一樣
     // 提醒：這類 class 改版後可能要重抓。
+    //
+    // roots 拿掉 [class*='product']：manifest.json 的 host_permissions／content_scripts
+    // 只涵蓋 detail.tmall.com／item.taobao.com 這兩個「單一商品頁」網域，淘寶天貓真正的
+    // 搜尋／分類列表頁在完全不同的網域（s.taobao.com、list.tmall.com 等），擴充功能根本
+    // 不會在那些頁面執行，所以這裡不需要、也不會用到任何「列表卡片」層級的 root。留著
+    // [class*='product'] 這個通用退回選擇器只有風險沒有好處——這次多站測試已經在
+    // trplus（命中按鈕自己）、mrliving／hoihome／momo（命中太近的 wrapper）、nitori
+    // （命中一個純版面標記的 .product-page，不是任何卡片）各發現一種變形的同類問題，
+    // 這兩站的登入/地區限制讓我們這次沒辦法抓到真實頁面驗證，保守起見直接拿掉，只留
+    // main／document 這條會強制走 isPageLevelRoot() → extractProduct()（JSON-LD 優先）
+    // 的路徑，不要冒同一種錯誤再發生一次的風險。
     "detail.tmall.com": {
       name: "天貓 Tmall",
       buttons: ["#collectBtn"],
-      roots: ["main", "[class*='product']"],
+      roots: ["main"],
       title: ["h1", "[class*='mainTitle--']"],
       price: ["[class*='highlightPrice--'] [class*='text--']", "[class*='price']"]
     },
     "item.taobao.com": {
       name: "淘寶網",
       buttons: ["#collectBtn"],
-      roots: ["main", "[class*='product']"],
+      roots: ["main"],
       title: ["h1", "[class*='mainTitle--']"],
       price: ["[class*='highlightPrice--'] [class*='text--']", "[class*='price']"]
+    },
+    // hoihome.tw 是 91APP 電商 SaaS 平台。單一商品頁（SalePage/Index/<id>）是舊版
+    // AngularJS（SalePageIndexCtrl 是平台本身的 controller 名稱，非這個商店自訂）：
+    // <a data-qe-id="body-add-to-wishlist-icon" class="fav-btn" ng-click="SalePageIndexCtrl.ToggleFav($event)">
+    // data-qe-id 是 91APP 自己 QA 測試用的錨點，跟 PChome 的 data-regression 同一種思路，
+    // 比 class 穩定；JSON-LD 商品資料完整（name/price/sku 都有，價格已經是 TWD）。
+    //
+    // 商品列表頁（v2/official/SalePageCategory/...）是完全不同的新版前端（React +
+    // styled-components），跟上面的 PDP 選擇器不通用，實測（headless Chrome 渲染後）
+    // 找到每張卡片的結構：
+    // <a href="/SalePage/Index/10717802" class="... product-card__vertical ...">
+    //   <div class="... product-card__vertical__wrapper">
+    //     <div data-qe-id="body-meta-field-text">商品名稱</div>
+    //     <div data-qe-id="body-suggest-price-text">NT$45,000</div>（原價，不要用這個）
+    //     <div data-qe-id="body-price-text">NT$37,100</div>（實際售價）
+    //     <span data-qe-id="product-card-favor-btn"><i class="ico ico-heart"></i></span>
+    //   </div>
+    // </a>
+    // product-card__vertical 是唯一同時命中整張卡片、且涵蓋名稱/價格/按鈕的 class——
+    // styled-components 那些 "sc-xxxxx" 雜湊 class 每次建置都會換，這個才是主題自訂、
+    // 看起來穩定的語意 class。roots 不放 [class*='product']：卡片內層 wrapper div 的
+    // class 也帶 "product-card__vertical__wrapper"，比外層 <a> 更近，會被
+    // [class*='product'] 搶先命中，但那層 div 不是 <a>、沒有 href，讀不到網址／貨號
+    // （見下方 cardOverrides，跟 mrliving 那次遇到的問題是同一種）。
+    "www.hoihome.tw": {
+      name: "好好生活 HOIHOME",
+      buttons: ["[data-qe-id='body-add-to-wishlist-icon']", ".fav-btn", "[data-qe-id='product-card-favor-btn']"],
+      roots: [".product-card__vertical", "main"],
+      title: ["h1", "[data-qe-id='body-meta-field-text']"],
+      price: ["[data-qe-id='body-price-text']", "[class*='price']"]
+    },
+    // mrliving.com.tw 是 Magento 2 電商平台。使用者給的網址其實是分類列表頁
+    // （/furniture/bedroom/bedroom-bed.html），不是單一商品頁，從列表頁裡的
+    // .product-item-link 找到實際商品頁再驗證。實測 HTML 找到：
+    // <a href="#" class="action towishlist" data-post='{"action":"...\/wishlist\/index\/add\/",...}' data-action="add-to-wishlist">
+    // data-action="add-to-wishlist" 是 Magento 核心慣例用的屬性名稱，比自訂主題可能覆蓋的
+    // class 更穩定。JSON-LD 商品資料完整（name/offers.price/sku/mpn 都有）。
+    // Magento 的商品頁跟分類頁網址都是任意深度 + .html 結尾，沒有像其他站那樣的固定
+    // 路徑片段可以判斷「這是不是商品頁」，isProductPage() 完全靠 JSON-LD 偵測，見下方。
+    // roots 多加 ".product-item-info"：分類列表頁每張卡片實測結構是
+    // <div class="product-item-info" data-mrlsku="10-0396-0-26-v2"><a class="product-item-link">
+    // 商品名稱</a>...<div class="price-box">...</div>...</div>，沒加的話（find之前只有
+    // "main"／通用 [class*='product']）點卡片上的收藏會抓到整頁分類名稱，不是這張卡片
+    // 自己的商品名稱。
+    // roots 不放 [class*='product'] 這個泛用退回選擇器：Magento 卡片內部本身就用
+    // "product-item-details"／"product-item-inner"／"product-item-actions" 這類
+    // 一路都帶 "product" 字樣的 wrapper class 把按鈕包起來，[class*='product'] 反而會在
+    // 比 .product-item-info 更近的地方先命中（例如 product-item-actions），導致
+    // 抓到的容器裡沒有名稱連結／價格／data-mrlsku（那些是這層的手足節點，不是子孫）。
+    // .product-item-info 本身已經是實測驗證過、涵蓋名稱+價格+貨號的卡片容器，不需要
+    // 這個退回層。
+    "www.mrliving.com.tw": {
+      name: "MR.LIVING 居家先生",
+      buttons: ["[data-action='add-to-wishlist']", ".towishlist"],
+      roots: [".product-item-info", "main"],
+      title: ["h1", ".product-item-link"],
+      price: [".price-wrapper .price", "[class*='price']"]
     }
   };
 
@@ -162,10 +298,21 @@
     };
   }
 
+  // 之前這裡是「一個一個試」：陣列裡排在前面的選擇器只要有任何一層祖先符合，就直接
+  // 傳回那一層，完全不管它是不是離按鈕最近的那一層。幾乎每一站的 roots 都把
+  // "main"（通常整頁最外層就有）排在較前面，導致真正該用的、離按鈕最近的卡片容器
+  // （例如 mrliving 的 .product-item-info、宜得利的 .item）根本沒機會被用到——
+  // 因為只要 "main" 這個很寬鬆的祖先存在，迴圈第一輪就直接回傳整頁的 <main>，
+  // 後面更精確的選擇器連試都沒試。改成把所有選擇器合併成一組逗號分隔的字串，一次呼叫
+  // closest()：瀏覽器原生就會從按鈕本身往上一層一層比對，遇到第一個符合「任何一個」
+  // 選擇器的祖先就停下來，天生就是照實際 DOM 距離決定，不會被陣列順序誤導。
   function findRoot(button) {
-    for (const selector of rule?.roots || []) {
-      try { const found = button.closest(selector); if (found) return found; } catch (_) {}
-    }
+    const selectors = (rule?.roots || []).filter(Boolean);
+    if (!selectors.length) return document;
+    try {
+      const found = button.closest(selectors.join(","));
+      if (found) return found;
+    } catch (_) {}
     return document;
   }
 
@@ -255,12 +402,99 @@
   // 當成「卡片」處理、一路只走 metaProduct() 那條路徑、永遠碰不到 extractProduct() 裡
   // 处理過的網址貨號覆蓋——這正是先前貨號還是顯示成整串網址編碼字串的原因。統一在這裡
   // 補一次 withSiteOverrides()，不管走哪條路徑，這幾站最後都會套用同一套覆蓋規則。
+  // metaProduct() 的 articleNo／url 沒有更好的資料來源時會退回猜 location.pathname／
+  // location.href——那是「目前這個頁面」的網址。點的若是分類列表頁裡某一張商品卡片
+  // （不是單一商品頁本身），猜出來的網址／貨號其實是這個列表頁自己的，不是被點的那張
+  // 卡片對應的商品。mrliving 的卡片容器（.product-item-info）自己就帶著 data-mrlsku
+  // 屬性、商品名稱連結（.product-item-link）也帶著這張卡片真正的網址，找得到的話直接
+  // 讀出來蓋掉猜的值，比猜頁面網址準。
+  function cardOverrides(cardRoot, product) {
+    if (location.hostname === "www.mrliving.com.tw" && cardRoot?.querySelector) {
+      const sku = cardRoot.getAttribute?.("data-mrlsku");
+      if (sku) product.articleNo = sku;
+      const link = cardRoot.querySelector(".product-item-link");
+      if (link?.href) product.url = link.href;
+    }
+    // hoihome 列表卡片本身就是一顆 <a href="/SalePage/Index/<商品id>">，卡片內沒有
+    // meta 標籤可讀，metaProduct() 的 articleNo/url 會退回猜 location.href——那是整個
+    // 列表頁自己的網址，不是這張卡片對應的商品頁。直接讀這顆 <a> 的 href 更準，商品 id
+    // 也跟 isProductPage() 判斷單一商品頁用的 /SalePage/Index/ 是同一種網址格式。
+    if (location.hostname === "www.hoihome.tw" && cardRoot?.tagName === "A") {
+      const m = (cardRoot.getAttribute("href") || "").match(/\/SalePage\/Index\/(\d+)/i);
+      if (m) product.articleNo = m[1];
+      if (cardRoot.href) product.url = cardRoot.href;
+    }
+    // PChome 賣場列表頁卡片的收藏鈕跟商品連結是手足關係，不在同一個 <a> 底下（見上面
+    // roots 註解），metaProduct() 的 articleNo/url 沒有更好的來源時會退回猜
+    // location.pathname——那永遠是賣場代碼本身（例如 "DQCE0N"），不是被點的那張商品卡片。
+    // 直接讀卡片裡 .c-prodInfoV2__link 的 href（例如 /prod/DEDS0A-A900FMLAE?fq=...），
+    // 跟商品頁本身網址格式一致，用同一組 /prod/<code> 規則取出真正的商品貨號。
+    if (location.hostname === "24h.pchome.com.tw" && cardRoot?.querySelector) {
+      const link = cardRoot.querySelector(".c-prodInfoV2__link");
+      if (link?.href) {
+        product.url = link.href;
+        const m = link.href.match(/\/prod\/([^/?#]+)/i);
+        if (m) product.articleNo = m[1];
+      }
+    }
+    // momo 分類列表頁卡片裡的 [data-testid='market-price'] 實測是「原價」（劃線價），
+    // 它前一個手足元素才是實際售價（兩個 <span>「$」+「3,280」組成，沒有 class 可選，
+    // 只能用 previousElementSibling 抓，見上面 roots 註解）。articleNo/url 則從卡片的
+    // 覆蓋連結（data-testid='goods-card-overlay' 或 'goods-image-container'）讀 href，
+    // 網址裡的 i_code 查詢參數就是商品 id。
+    if (location.hostname === "www.momoshop.com.tw" && cardRoot?.querySelector) {
+      const priceEl = cardRoot.querySelector("[data-testid='market-price']")?.previousElementSibling;
+      const p = priceNumber(text(priceEl));
+      if (p) product.price = p;
+      const link = cardRoot.querySelector("[data-testid='goods-card-overlay'],[data-testid='goods-image-container']");
+      if (link?.href) {
+        product.url = link.href;
+        const m = link.href.match(/i_code=(\d+)/i);
+        if (m) product.articleNo = m[1];
+      }
+    }
+    // 宜得利分類列表頁／輪播卡片（.item）裡的名稱／價格 metaProduct() 已經抓得到（見上面
+    // roots 註解），只有 articleNo/url 沒有更好的來源，會退回猜 location.pathname
+    // （分類頁自己的網址）。直接讀卡片裡 .heading a 或 .img a 的 href（兩個連結一樣，
+    // 都是 /product/<商品代碼>），跟商品頁本身網址格式一致。
+    if (location.hostname === "www.nitori-net.tw" && cardRoot?.querySelector) {
+      const link = cardRoot.querySelector(".heading a, .img a");
+      if (link?.href) {
+        product.url = link.href;
+        const m = link.href.match(/\/product\/([^/?#]+)/i);
+        if (m) product.articleNo = m[1];
+      }
+    }
+    // 特力屋列表卡片本身就是一顆 <a data-id-item="<商品代碼>" href="https://www.trplus.
+    // com.tw/p/<商品代碼>?...">（見上面 roots 註解），data-id-item 在 JS 裡對應
+    // dataset.idItem（不是 dataset.item，屬性名稱是 "data-id-item" 不是 "data-item"），
+    // 直接讀出來比從 href 用正規表達式解析更直接、也更不會受網址上其他查詢參數影響。
+    if (location.hostname === "www.trplus.com.tw" && cardRoot?.tagName === "A") {
+      if (cardRoot.dataset.idItem) product.articleNo = cardRoot.dataset.idItem;
+      if (cardRoot.href) product.url = cardRoot.href;
+    }
+    return product;
+  }
+  // findRoot() 找不到比「main／document」更精確的卡片容器時，代表這次點擊根本不是
+  // 落在某張列表卡片上——很可能就是單一商品頁自己的收藏鈕（例如 mrliving：roots 裡
+  // 一定有 "main"，商品頁本身也一定在 <main> 底下，但商品頁上不會有 .product-item-info
+  // 這種只在列表卡片才有的 class，findRoot() 只好退到整個 <main>）。這種情況下改用
+  // extractProduct()（會先試 jsonLdProduct()，拿到平台自己的 sku／mpn 真正貨號），
+  // 不要硬用 metaProduct(整個 main) —— 之前這裡不分青紅皂白一律先掃 metaProduct(cardRoot)，
+  // 只要 root 底下剛好找得到 h1（幾乎每個商品頁都有），就會回傳「有抓到」，永遠不會走到
+  // 後面 jsonLdProduct() 那條路，商品頁自己點收藏時貨號只能退回猜 location.pathname
+  // （網址 slug，不是真正的 SKU）。
+  function isPageLevelRoot(root) {
+    return !root || root === document || root.tagName === "MAIN";
+  }
   // extractProduct() 內部已經呼叫過一次 withSiteOverrides()，這裡用 cardProduct 分開
   // 判斷、只在真的走 metaProduct(findRoot(button)) 這條路徑時才自己補呼叫一次，避免
   // 走 extractProduct() 那條路徑時被重複呼叫兩次（雖然兩次結果一樣，只是白白多算一次）。
   function extractCardProduct(button) {
-    const cardProduct = metaProduct(findRoot(button));
-    return cardProduct ? withSiteOverrides(cardProduct) : extractProduct();
+    const cardRoot = findRoot(button);
+    if (isPageLevelRoot(cardRoot)) return extractProduct();
+    const cardProduct = metaProduct(cardRoot);
+    return cardProduct ? withSiteOverrides(cardOverrides(cardRoot, cardProduct)) : extractProduct();
   }
   function extractProductFromButtonData(button) {
     const name = button.dataset.name || button.dataset.productName;
@@ -269,7 +503,11 @@
   }
   // 各站商品頁網址規則不一：pchome 是 /prod/、momo 與宜得利是 /product/、酷澎是
   // /products/（複數）、特力屋是 /p/、蝦皮則是 /任意名稱-i.<商店id>.<商品id> 沒有固定的路徑片段、
-  // 淘寶/天貓則是固定的 /item.htm（商品id 放在查詢參數 ?id= 裡，不在路徑上）。
+  // 淘寶/天貓則是固定的 /item.htm（商品id 放在查詢參數 ?id= 裡，不在路徑上）、
+  // hoihome（91APP）是 /SalePage/Index/<商品id>。
+  // mrliving（Magento）沒有加規則：商品頁跟分類頁網址都是任意深度 + .html 結尾，
+  // 兩者無法用路徑判斷區分，只能靠下面的 jsonLdProduct() 偵測（這個平台的商品頁固定
+  // 有完整 JSON-LD，實測過可以直接吃到，不需要路徑規則兜底）。
   function isProductPage() {
     if (!rule) return false;
     if (jsonLdProduct()) return true;
@@ -277,6 +515,7 @@
     if (/\/p\//i.test(location.pathname)) return true;
     if (/-i\.\d+\.\d+(?:[/?#]|$)/.test(location.pathname)) return true;
     if (/\/item\.htm/i.test(location.pathname)) return true;
+    if (/\/SalePage\/Index\//i.test(location.pathname)) return true;
     return false;
   }
   // Planner（設計組合頁）跟一般商品頁是不同網域：planner.ikea.com.tw／planner.ikea.com.hk，
