@@ -39,6 +39,7 @@ check(!/\beval\s*\(|new Function\s*\(|importScripts\s*\(|<script[^>]+src=/i.test
 
 const requiredAssets = [
   ["docs/store-assets/promo-small-440x280.png", 440, 280],
+  ["docs/store-assets/promo-marquee-1400x560.png", 1400, 560],
   ["docs/store-assets/screenshot-01-overview.png", 1280, 800],
   ["docs/store-assets/screenshot-02-add-product.png", 1280, 800],
   ["docs/store-assets/screenshot-03-room-list.png", 1280, 800],

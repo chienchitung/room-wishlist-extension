@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560" role="img" aria-labelledby="title desc">
+  <title id="title">RoomList Chrome Web Store marquee promotional tile</title>
+  <desc id="desc">RoomList organizes home products from multiple stores into room-based shopping lists</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#25382C"/>
+      <stop offset="1" stop-color="#45624E"/>
+    </linearGradient>
+    <linearGradient id="button" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#D9A56D"/>
+      <stop offset="1" stop-color="#C6A668"/>
+    </linearGradient>
+    <filter id="panel-shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#15231A" flood-opacity=".34"/>
+    </filter>
+  </defs>
+
+  <rect width="1400" height="560" fill="url(#background)"/>
+  <circle cx="1288" cy="68" r="260" fill="#D9A56D" opacity=".13"/>
+  <circle cx="90" cy="590" r="285" fill="#FFFFFF" opacity=".045"/>
+  <path d="M1040 0h360v240L1204 126Z" fill="#FFFFFF" opacity=".025"/>
+
+  <g transform="translate(104 91)">
+    <rect width="86" height="86" rx="23" fill="#FFFFFF"/>
+    <rect x="9" y="9" width="68" height="68" rx="18" fill="none" stroke="#C6A668" stroke-width="2.8"/>
+    <path d="M18 20 33 33h44M33 33v37M18 73l15-11h8M59 62h18" fill="none" stroke="#C6A668" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M28 31h6l5 27h28l6-21H37" fill="none" stroke="#464A47" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="46" cy="66" r="3.8" fill="#464A47"/>
+    <circle cx="64" cy="66" r="3.8" fill="#464A47"/>
+    <path d="M47 40c-4.8-4.8-11.4.8-6.4 6.4 1.6 2.3 4 4.4 6.4 6.1 2.5-1.7 4.8-3.8 6.4-6.1 5-5.6-1.6-11.2-6.4-6.4Z" fill="#45624E"/>
+  </g>
+
+  <text x="214" y="136" font-family="Avenir Next, PingFang TC, system-ui, sans-serif" font-size="48" font-weight="700" fill="#FFFFFF">RoomList</text>
+  <text x="214" y="174" font-family="Avenir Next, PingFang TC, system-ui, sans-serif" font-size="21" font-weight="500" fill="#DCE6DF">跨電商空間採購清單</text>
+  <text x="104" y="258" font-family="PingFang TC, system-ui, sans-serif" font-size="39" font-weight="700" fill="#FFFFFF">從喜歡的商品出發</text>
+  <text x="104" y="309" font-family="PingFang TC, system-ui, sans-serif" font-size="39" font-weight="700" fill="#FFFFFF">整理每一個空間</text>
+  <text x="104" y="363" font-family="PingFang TC, system-ui, sans-serif" font-size="18" fill="#DCE6DF">跨網站收藏・依空間分類・掌握預算・本機保存</text>
+
+  <g transform="translate(104 408)">
+    <rect width="196" height="53" rx="26.5" fill="url(#button)"/>
+    <path d="M31 19h4l3 16h17l4-12H37" fill="none" stroke="#25382C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="42" cy="40" r="2.3" fill="#25382C"/><circle cx="53" cy="40" r="2.3" fill="#25382C"/>
+    <text x="75" y="34" font-family="PingFang TC, system-ui, sans-serif" font-size="17" font-weight="700" fill="#25382C">加入採購清單</text>
+  </g>
+
+  <g transform="translate(648 79)" filter="url(#panel-shadow)">
+    <rect width="648" height="404" rx="28" fill="#FFFFFF"/>
+    <rect width="648" height="76" rx="28" fill="#F7F8F7"/>
+    <path d="M0 48h648v28H0Z" fill="#F7F8F7"/>
+    <text x="34" y="37" font-family="PingFang TC, system-ui, sans-serif" font-size="20" font-weight="700" fill="#25382C">我的採購清單</text>
+    <text x="34" y="61" font-family="PingFang TC, system-ui, sans-serif" font-size="12" fill="#6E746F">4 項商品・NT$15,747</text>
+    <circle cx="588" cy="38" r="17" fill="#FFFFFF" stroke="#DFDFDF"/>
+    <path d="M580 38h16M588 30v16" stroke="#45624E" stroke-width="2" stroke-linecap="round"/>
+
+    <g transform="translate(30 96)">
+      <rect width="80" height="30" rx="15" fill="#45624E"/>
+      <text x="26" y="20" font-family="PingFang TC, system-ui, sans-serif" font-size="12" font-weight="700" fill="#FFFFFF">全部</text>
+      <rect x="90" width="80" height="30" rx="15" fill="#F1F3F1"/>
+      <text x="116" y="20" font-family="PingFang TC, system-ui, sans-serif" font-size="12" font-weight="600" fill="#484848">客廳</text>
+      <rect x="180" width="80" height="30" rx="15" fill="#F1F3F1"/>
+      <text x="206" y="20" font-family="PingFang TC, system-ui, sans-serif" font-size="12" font-weight="600" fill="#484848">臥室</text>
+    </g>
+
+    <g transform="translate(30 151)">
+      <rect width="52" height="52" rx="10" fill="#E7ECE8"/>
+      <path d="M13 35 25 22l8 8 6-7v17H13Z" fill="#8DB49A"/>
+      <circle cx="36" cy="16" r="4" fill="#D9A56D"/>
+      <text x="70" y="18" font-family="PingFang TC, system-ui, sans-serif" font-size="14" font-weight="700" fill="#25382C">客廳家具商品</text>
+      <text x="70" y="40" font-family="PingFang TC, system-ui, sans-serif" font-size="11" fill="#747A75">來源網站・客廳・數量 1</text>
+      <text x="566" y="26" text-anchor="end" font-family="Avenir Next, system-ui, sans-serif" font-size="15" font-weight="700" fill="#25382C">NT$5,618</text>
+      <line y1="70" x2="588" y2="70" stroke="#E5E7E5"/>
+    </g>
+
+    <g transform="translate(30 241)">
+      <rect width="52" height="52" rx="10" fill="#F2EEE8"/>
+      <path d="M12 36h28V22l-8-7-8 9-5-4Z" fill="#C6A668" opacity=".82"/>
+      <text x="70" y="18" font-family="PingFang TC, system-ui, sans-serif" font-size="14" font-weight="700" fill="#25382C">臥室家居商品</text>
+      <text x="70" y="40" font-family="PingFang TC, system-ui, sans-serif" font-size="11" fill="#747A75">來源網站・臥室・數量 2</text>
+      <text x="566" y="26" text-anchor="end" font-family="Avenir Next, system-ui, sans-serif" font-size="15" font-weight="700" fill="#25382C">NT$8,139</text>
+    </g>
+
+    <g transform="translate(30 327)">
+      <text y="18" font-family="PingFang TC, system-ui, sans-serif" font-size="12" fill="#747A75">總金額</text>
+      <text x="588" y="22" text-anchor="end" font-family="Avenir Next, system-ui, sans-serif" font-size="24" font-weight="700" fill="#25382C">NT$15,747</text>
+      <rect y="36" width="588" height="42" rx="21" fill="#45624E"/>
+      <text x="294" y="63" text-anchor="middle" font-family="PingFang TC, system-ui, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">匯出 PDF 採購清單</text>
+    </g>
+  </g>
+</svg>

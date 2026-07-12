@@ -45,3 +45,5 @@ Shopping
 5. `screenshot-05-export.png`：PDF 匯出預覽
 
 另行上傳：`promo-small-440x280.png` 作為商店小型宣傳圖。
+
+選用跑馬燈宣傳圖：`promo-marquee-1400x560.png`。
