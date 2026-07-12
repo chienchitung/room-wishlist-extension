@@ -116,6 +116,7 @@
     .item-name:hover { text-decoration:underline; color:var(--brand-primary); }
     .item-meta { font-size:11.5px; color:var(--ink-secondary); margin-top:3px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
     .room-tag { font-size:11px; font-weight:600; background:var(--surface-hover); border-radius:var(--pill); padding:3px 9px; color:var(--ink); cursor:pointer; }
+    .source-tag { font-size:11px; font-weight:500; background:none; border:1px solid var(--border-disabled); border-radius:var(--pill); padding:2px 8px; color:var(--ink-secondary); }
     .qty-row { display:inline-flex; align-items:center; border-radius:var(--pill); box-shadow:0 0 0 1px var(--border-disabled); margin-top:9px; }
     .qty-btn { all:unset; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; text-align:center; }
     .qty-btn:hover { background:var(--surface-hover); border-radius:var(--pill); }
@@ -646,14 +647,15 @@
       savedId = plannerEditingItemId;
       toast(`已更新「${room}」清單`);
     } else {
-      const items = await storage.setProductRoom({ name, price, articleNo, url, image: "" }, room);
+      const source = (plannerProduct && plannerProduct.source) || "";
+      const items = await storage.setProductRoom({ name, price, articleNo, url, image: "", source }, room);
       savedId = items[items.length - 1].id;
       toast(`已加入「${room}」清單`);
     }
     // 記住剛存的是哪一筆、資料長怎樣：下一次自動擷取（可能還是通用字樣）跑進來時，
     // 浮動按鈕文字不會被打回「加入清單」，見 updatePlannerQuickAddLabel() 的說明。
     plannerEditingItemId = savedId;
-    plannerProduct = { name, price, articleNo, url, image: (plannerProduct && plannerProduct.image) || "" };
+    plannerProduct = { name, price, articleNo, url, image: (plannerProduct && plannerProduct.image) || "", source: (plannerProduct && plannerProduct.source) || "" };
     closePlannerAddModal();
     updatePlannerQuickAddLabel();
   }
@@ -735,6 +737,7 @@
           ${item.url ? `<a class="item-name" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.name)}</a>` : `<div class="item-name">${escapeHtml(item.name)}</div>`}
           <div class="item-meta">
             ${item.articleNo && item.articleNo !== "—" ? `<span>貨號 ${escapeHtml(item.articleNo)}</span>` : ""}
+            ${item.source ? `<span class="source-tag">${escapeHtml(item.source)}</span>` : ""}
             <span class="room-tag" data-id="${item.id}">${item.room} ▾</span>
           </div>
           <div class="qty-row" data-id="${item.id}">
@@ -1124,9 +1127,9 @@
       .forEach((room) => {
         const list = state.items.filter((i) => i.room === room);
         body += `<h2>${escapeHtml(room)}　<small>小計 ${fmt(roomTotal(room))}</small></h2><table>
-          <thead><tr><th>商品</th><th>貨號</th><th>單價</th><th>數量</th><th>小計</th></tr></thead><tbody>`;
+          <thead><tr><th>商品</th><th>來源</th><th>貨號</th><th>單價</th><th>數量</th><th>小計</th></tr></thead><tbody>`;
         list.forEach((i) => {
-          body += `<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.articleNo || "-")}</td><td>${fmt(i.price)}</td><td>${i.qty}</td><td>${fmt(i.price * i.qty)}</td></tr>`;
+          body += `<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.source || "-")}</td><td>${escapeHtml(i.articleNo || "-")}</td><td>${fmt(i.price)}</td><td>${i.qty}</td><td>${fmt(i.price * i.qty)}</td></tr>`;
         });
         body += `</tbody></table>`;
       });

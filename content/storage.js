@@ -159,6 +159,7 @@
       articleNo: product.articleNo || "",
       url: product.url || "",
       image: product.image || "",
+      source: product.source || "",
       addedAt: Date.now()
     });
     await setItems(items);

@@ -2,19 +2,38 @@
   "use strict";
 
   const SITE_RULES = {
+    // price 多加 .itemBTI：促銷「兩件優惠價」的價格用的是這個 class（例如
+    // <p class="itemBTI"><span data-price="249.9">$249.9</span><span class="units">
+    // / 2 件裝</span></p>），跟一般單價的 .itemNormalPrice 是不同 class，原本沒放
+    // 這個選擇器，遇到促銷組合價的商品清單卡片價格就會抓不到、顯示 0 元。
+    // <span class="units"> / 2 件裝</span> 這段會跟著一起被讀進 textContent，但
+    // priceNumber() 的正規表達式只從頭抓第一組數字，後面的「/ 2 件裝」不影響解析。
     "www.ikea.com.tw": {
       name: "IKEA 台灣",
       buttons: [".addFavorites", ".removeFavorites", ".card-favorites", ".wish-list-button__container", "[a11y-label*='wishlist' i]"],
       roots: [".itemBlock", ".product-carousel__item", "main"],
       title: ["h1", ".itemName", ".name__container"],
-      price: [".itemOfferPrice", ".itemLowerPrice", ".itemNormalPrice", "skapa-price"]
+      price: [".itemOfferPrice", ".itemLowerPrice", ".itemNormalPrice", ".itemBTI", "skapa-price"]
     },
+    // 實測（搜尋列表頁 + 商品頁，headless Chrome 渲染）發現香港站跟台灣站的收藏按鈕
+    // 實作不一樣，原本這條規則整組選擇器幾乎都選不到：
+    // - 商品頁自己的收藏鈕沒有 .addFavorites（台灣站才有這個 class），是
+    //   <skapa-button class="inFavList" a11y-label="從購物清單中删除">——注意
+    //   a11y-label 這裡已經是翻譯過的中文文字，不是英文 i18n key，[a11y-label*='wishlist' i]
+    //   選不到；.inFavList 才是唯一命中的錨點。
+    // - 列表頁／搜尋結果每張卡片的收藏鈕是 <skapa-button class="card-favorites sk-btn"
+    //   a11y-label="從購物清單中删除">，原本規則裡完全沒有 .card-favorites（台灣站才有）。
+    // - "wish-list-button"（沒有點）原本就是無效選擇器：沒有 <wish-list-button> 這個
+    //   標籤，只有 class="wish-list-button__container"，這條規則從頭到尾沒作用過。
+    // - PDP 裡「其他人也看了」那個新版 Vue/Skapa 推薦輪播（跟台灣站同一套元件）用的是
+    //   .wish-list-button__container + a11y-label="accessibility.wishlist-remove"
+    //   （這裡才是英文 i18n key，沒被翻譯），這兩個原本就在規則裡，這部分本來就有效。
     "www.ikea.com.hk": {
       name: "IKEA 香港",
-      buttons: [".addFavorites", ".removeFavorites", "wish-list-button", ".wish-list-button__container", "[a11y-label*='wishlist' i]"],
+      buttons: [".addFavorites", ".removeFavorites", ".card-favorites", ".inFavList", ".wish-list-button__container", "[a11y-label*='wishlist' i]", "[a11y-label*='購物清單' i]"],
       roots: [".itemBlock", ".product-carousel__item", "main"],
       title: ["h1", ".itemName", ".name__container"],
-      price: [".itemOfferPrice", ".itemLowerPrice", ".itemNormalPrice", "skapa-price"]
+      price: [".itemOfferPrice", ".itemLowerPrice", ".itemNormalPrice", ".itemBTI", "skapa-price"]
     },
     // PChome 商品頁的加入追蹤按鈕實際結構是
     // <div class="c-compoundBtnTool c-compoundBtnTool--track" role="button"><button class="btn ..."><span class="btn__noFrame ...">
@@ -338,7 +357,34 @@
     if (location.hostname === "detail.tmall.com" || location.hostname === "item.taobao.com") {
       return new URLSearchParams(location.search).get("id") || "";
     }
+    // IKEA 官網自己顯示的「型號」就是 JSON-LD 裡的 sku（例如 "906.186.44"，純數字，
+    // 三三二用句點分組），不需要另外自己組一個帶英文字母的版本——優先直接用這個官方
+    // 欄位，只有找不到 JSON-LD 時才退回從網址解析裸數字 id。
+    if (location.hostname === "www.ikea.com.tw" || location.hostname === "www.ikea.com.hk") {
+      const ld = jsonLdProduct();
+      if (ld && ld.articleNo) return ld.articleNo;
+      return ikeaArticleNoFromHref(location.href);
+    }
     return "";
+  }
+
+  // IKEA 官網自己的型號固定是 8 碼數字、三三二用句點分組（例如 JSON-LD sku
+  // "906.186.44"）。卡片／列表頁沒有自己的 JSON-LD 可讀，只能從網址解析出裸數字
+  // （例如 "90618644"）——如果不比照官網格式重新分組，同一件商品從卡片加入 vs 從它
+  // 自己的商品頁加入，會變成兩種不同字串（"90618644" vs "906.186.44"），
+  // sameProduct() 拿去比對永遠對不上：同一件商品被當成兩件分別加入清單，開啟收藏
+  // 選單時也判斷不出「這件其實已經加過了」而不會顯示移除選項。非 8 碼的情況（目前沒
+  // 實測遇過，但保守起見）不確定分組規則，直接回傳裸數字，不硬湊格式。
+  function ikeaFormatArticleNo(digits) {
+    const d = String(digits || "").replace(/\D/g, "");
+    return d.length === 8 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 8)}` : d;
+  }
+
+  // IKEA 網址固定是 .../<名稱slug>-<型別代碼>-<數字id>，例如
+  // ".../skogsfraken-art-90618644"、".../markus-spr-99628040"。
+  function ikeaArticleNoFromHref(href) {
+    const m = String(href || "").match(/-(\d+)(?:[/?#]|$)/i);
+    return m ? ikeaFormatArticleNo(m[1]) : "";
   }
 
   // 淘寶／天貓的商品原始標價是人民幣，但清單裡其他站全部都是新台幣，直接把人民幣數字
@@ -473,6 +519,40 @@
       if (cardRoot.dataset.idItem) product.articleNo = cardRoot.dataset.idItem;
       if (cardRoot.href) product.url = cardRoot.href;
     }
+    // IKEA 商品頁有兩種完全不同的推薦卡片元件（實測都出現在同一個商品頁上，取決於
+    // 是哪一種推薦區塊）：
+    //   1. 舊版「商品推薦」/分類列表頁：<div class="itemBlock">...<a class="itemName">
+    //      <h6>MARKUS</h6></a>...<span class="itemFacts">辦公椅附扶手...</span>...
+    //      名稱／敘述本來就分開放在不同元素，metaProduct() 用 .itemName 選到的名稱
+    //      本身是乾淨的，只是沒帶上 itemFacts 那段中文敘述——同一個英文品名（例如
+    //      "HÖSTVÄDD"）常常有多種顏色/尺寸款式，只顯示英文名稱沒辦法分辨是哪一款。
+    //   2. 新版「其他人也看了」（Vue + Skapa 元件）：<div class="product-carousel__item">
+    //      ...<div class="name__container"><a><h2 class="name">SMÅSPORRE</h2></a>
+    //      <span class="facts">四季被, 200x200 公分</span>...<skapa-price>$1,699
+    //      </skapa-price>...</div>——這裡 .name__container 整層（title 陣列third選項）
+    //      的 textContent 是名稱+敘述+價格全部黏在一起、中間沒有任何分隔字元，例如
+    //      「SMÅSPORRE四季被, 200x200 公分$1,699」，這正是使用者截圖回報「商品名稱
+    //      有金額」的原因。
+    // 兩種都改成自己組「英文名稱 + 空格 + 中文敘述」，不用 metaProduct() 選到的整層
+    // 容器文字。
+    //
+    // articleNo/url：兩種卡片各自的商品連結 class 不一樣（itemName 本身是 <a>；
+    // product-carousel__item 裡的連結是 <a class="link ...">，不是 itemName 也不是
+    // d-block），原本的選擇器只涵蓋第一種，第二種找不到連結時 metaProduct() 只能退回
+    // 猜 location.href（目前正在看的這一頁），導致「其他人也看了」裡不同商品的貨號全部
+    // 顯示成同一個（目前頁面自己的），sameProduct() 誤判成同一件商品、沒辦法依序加入
+    // 好幾件不同商品——這裡把 a.link 也加進去涵蓋第二種卡片。
+    if ((location.hostname === "www.ikea.com.tw" || location.hostname === "www.ikea.com.hk") && cardRoot?.querySelector) {
+      const nameText = text(cardRoot.querySelector(".itemName, .name__container h2, .name__container .name"));
+      const factsText = text(cardRoot.querySelector(".itemFacts, .name__container .facts"));
+      if (nameText) product.name = factsText ? `${nameText} ${factsText}` : nameText;
+      const link = cardRoot.querySelector("a.itemName, a.d-block, a.link");
+      if (link?.href) {
+        product.url = link.href;
+        const articleNo = ikeaArticleNoFromHref(link.href);
+        if (articleNo) product.articleNo = articleNo;
+      }
+    }
     return product;
   }
   // findRoot() 找不到比「main／document」更精確的卡片容器時，代表這次點擊根本不是
@@ -490,16 +570,30 @@
   // extractProduct() 內部已經呼叫過一次 withSiteOverrides()，這裡用 cardProduct 分開
   // 判斷、只在真的走 metaProduct(findRoot(button)) 這條路徑時才自己補呼叫一次，避免
   // 走 extractProduct() 那條路徑時被重複呼叫兩次（雖然兩次結果一樣，只是白白多算一次）。
+  //
+  // 順序很重要：cardOverrides() 一定要在 withSiteOverrides() 之後執行。withSiteOverrides()
+  // 裡的 articleNoFromUrl() 是拿「目前這一頁」的網址解析（IKEA 現在也用這個機制，見上面
+  // articleNoFromUrl() 註解），如果先呼叫 cardOverrides() 把卡片自己的貨號設好、後面
+  // withSiteOverrides() 才執行，會被目前頁面的網址貨號蓋回去——對蝦皮／酷澎／淘寶／天貓
+  // 沒差（這幾站目前沒有卡片專屬的 cardOverrides 分支），但 IKEA 兩種都有，一定要讓
+  // 卡片自己的資料最後生效，不然「你可能也喜歡」推薦卡片點收藏，貨號又會被目前正在看的
+  // 這件商品蓋掉。
   function extractCardProduct(button) {
     const cardRoot = findRoot(button);
     if (isPageLevelRoot(cardRoot)) return extractProduct();
     const cardProduct = metaProduct(cardRoot);
-    return cardProduct ? withSiteOverrides(cardOverrides(cardRoot, cardProduct)) : extractProduct();
+    return cardProduct ? cardOverrides(cardRoot, withSiteOverrides(cardProduct)) : extractProduct();
   }
+  // 目前只有 IKEA 的 .addFavorites/.card-favorites 帶 data-name，這個函式對其他站
+  // 永遠回傳 null（其他站的按鈕都沒有這組 data 屬性）。套用 withSiteOverrides() 讓
+  // IKEA 也能吃到 articleNoFromUrl() 的字母+數字格式（例如 "ART-90618644"）——不然
+  // 這裡讀到的 button.dataset.item 只有裸數字 "90618644"，跟卡片路徑（cardOverrides）
+  // 或整頁路徑（extractProduct）抓到的格式不一致，sameProduct() 會誤判成不同商品。
   function extractProductFromButtonData(button) {
     const name = button.dataset.name || button.dataset.productName;
     if (!name) return null;
-    return { name, price: priceNumber(button.dataset.price), image: button.dataset.image || "", articleNo: button.dataset.item || button.dataset.sku || "", url: location.href, source: rule?.name || location.hostname };
+    const product = { name, price: priceNumber(button.dataset.price), image: button.dataset.image || "", articleNo: button.dataset.item || button.dataset.sku || "", url: location.href, source: rule?.name || location.hostname };
+    return withSiteOverrides(product);
   }
   // 各站商品頁網址規則不一：pchome 是 /prod/、momo 與宜得利是 /product/、酷澎是
   // /products/（複數）、特力屋是 /p/、蝦皮則是 /任意名稱-i.<商店id>.<商品id> 沒有固定的路徑片段、
@@ -511,6 +605,18 @@
   function isProductPage() {
     if (!rule) return false;
     if (jsonLdProduct()) return true;
+    // IKEA 的網址namespace是 /products/<分類>/.../<名稱>-<型別代碼>-<數字id>，分類列表頁
+    // 跟單一商品頁共用同一個 "/products/" 字首（例如列表頁
+    // /zh/products/duvets-pillows-and-protectors/pillow-cases，商品頁
+    // /zh/products/duvets-pillows-and-protectors/duvets/skogsfraken-art-90618644），
+    // 下面給其他站用的通用 /\/prod(?:ucts?)?\// 規則沒辦法分辨——只要路徑裡有
+    // "/products/" 就會誤判成商品頁，導致分類列表頁也會跑出懸浮的「加入採購清單」按鈕，
+    // 使用者分不清楚按下去到底要加哪一件商品。IKEA 真正商品頁的網址一定以
+    // "-<型別代碼>-<數字id>" 結尾（見 ikeaArticleNoFromHref() 註解），列表頁不會有這段，
+    // 用這個判斷才分得出來；這裡提早 return（不管真假）避免繼續往下掉到通用規則。
+    if (location.hostname === "www.ikea.com.tw" || location.hostname === "www.ikea.com.hk") {
+      return /-[a-z]{2,4}-\d+(?:[/?#]|$)/i.test(location.pathname);
+    }
     if (/\/prod(?:ucts?)?\//i.test(location.pathname)) return true;
     if (/\/p\//i.test(location.pathname)) return true;
     if (/-i\.\d+\.\d+(?:[/?#]|$)/.test(location.pathname)) return true;
