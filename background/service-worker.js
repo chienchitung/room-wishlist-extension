@@ -14,3 +14,9 @@ chrome.action.onClicked.addListener((tab) => {
     /* 該分頁可能不是支援的購物網站，沒有 content script 可回應 */
   });
 });
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message && message.type === "OPEN_PRIVACY_POLICY") {
+    chrome.tabs.create({ url: chrome.runtime.getURL("privacy.html") });
+  }
+});

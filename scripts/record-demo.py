@@ -166,6 +166,16 @@ def dismiss_site_overlays(page: Page) -> None:
 def add_product_to_room(page: Page, store: str, url: str, room: str, load_wait: int) -> None:
     page.goto(url, wait_until="domcontentloaded", timeout=90_000)
     page.wait_for_selector("#__roomlist_wishlist_host__", state="attached", timeout=30_000)
+    # 全新錄影 profile 第一次使用時必須先完成隱私揭露。按下同意後頁面會重新載入，
+    # 等待面板重新掛載再繼續，確保錄影流程與正式版本的資料同意門檻一致。
+    privacy_accept = page.locator("#__roomlist_wishlist_host__ #btnAcceptPrivacy")
+    try:
+        privacy_accept.wait_for(state="visible", timeout=2_000)
+        privacy_accept.click(force=True)
+        page.wait_for_load_state("domcontentloaded", timeout=30_000)
+        page.wait_for_selector("#__roomlist_wishlist_host__", state="attached", timeout=30_000)
+    except Exception:
+        pass
     pause(page, load_wait)
     dismiss_site_overlays(page)
 

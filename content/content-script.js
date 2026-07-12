@@ -34,12 +34,14 @@
     : [...adapter.DOM_SELECTORS.cardFavoriteButton, ...adapter.DOM_SELECTORS.pdpFavoriteButton].join(",");
 
   // 使用者可以在設定裡關掉整個擴充功能，關掉後點擊要完全放行、不能攔。讀取設定是
-  // 非同步的，但點擊監聽器必須同步判斷要不要攔截，所以用一個模組變數快取目前的值，
-  // 先樂觀預設為 true（開），等真正的設定值讀回來、或使用者改設定時再更新。
-  let extensionEnabled = true;
+  // 非同步的，但點擊監聽器必須同步判斷要不要攔截，所以用模組變數快取目前的值。
+  // 未完成隱私同意前保守預設不啟用，避免設定讀回來前先攔截或擷取頁面內容。
+  let extensionEnabled = false;
+  let privacyAccepted = false;
   function refreshEnabledFlag() {
     window.__roomlistStorage.getSettings().then((s) => {
-      extensionEnabled = s.extensionEnabled !== false;
+      privacyAccepted = !!s.privacyAcceptedAt;
+      extensionEnabled = privacyAccepted && s.extensionEnabled !== false;
     });
   }
   refreshEnabledFlag();
@@ -48,7 +50,7 @@
   if (!onPlannerPage) document.addEventListener("click", onCaptureClick, true);
 
   function onCaptureClick(e) {
-    if (!extensionEnabled) return; // 關閉狀態下完全不攔截，讓官網原生行為正常運作
+    if (!privacyAccepted || !extensionEnabled) return; // 未同意或關閉時完全不攔截
     const btn = e.target.closest(FAVORITE_SELECTOR);
     if (!btn) return;
     e.preventDefault();
@@ -116,7 +118,7 @@
     }
 
     function syncPlannerButton() {
-      if (!extensionEnabled) {
+      if (!privacyAccepted || !extensionEnabled) {
         logReason("擴充功能目前是暫停狀態（設定裡的開關關閉），按鈕不會顯示。點瀏覽器工具列上的擴充功能圖示可以強制打開面板去打開開關。");
         panel.hidePlannerQuickAdd();
         return;
@@ -156,6 +158,10 @@
       if (onPlannerPage) setupPlannerPage();
       else {
         const syncProductQuickAdd = () => {
+          if (!privacyAccepted || !extensionEnabled) {
+            panel.hidePlannerQuickAdd();
+            return;
+          }
           const product = adapter.extractProduct();
           if (product && adapter.isProductPage()) panel.showPlannerQuickAdd(product);
           else panel.hidePlannerQuickAdd();

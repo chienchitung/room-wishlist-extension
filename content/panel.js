@@ -159,6 +159,8 @@
     .modal { width:460px; max-width:92vw; background:var(--surface); border-radius:var(--radius-md); padding:24px; box-shadow:var(--shadow-pop); max-height:85vh; overflow-y:auto; }
     .modal h3 { margin:0 0 4px; font-size:16px; }
     .modal p { margin:0 0 16px; font-size:12px; color:var(--ink-secondary); }
+    .privacy-points { margin:14px 0 16px; padding-left:20px; font-size:12.5px; line-height:1.65; color:var(--ink-secondary); }
+    .privacy-link { all:unset; color:var(--brand-primary); cursor:pointer; font-size:12px; font-weight:600; text-decoration:underline; }
     .field { margin-bottom:12px; }
     .field label { display:block; font-size:12px; color:var(--ink-secondary); margin-bottom:4px; }
     .field input { all:unset; box-sizing:border-box; width:100%; border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border-disabled); padding:9px 10px; font-size:13px; color:var(--ink); background:var(--surface); }
@@ -338,6 +340,23 @@
           </div>
         </div>
       </div>
+      <div class="modal-scrim" id="privacyScrim" role="dialog" aria-modal="true" aria-labelledby="privacyTitle">
+        <div class="modal">
+          <h3 id="privacyTitle">開始使用 RoomList 前</h3>
+          <p>為了把電商商品整理成你的空間採購清單，RoomList 需要處理下列資料：</p>
+          <ul class="privacy-points">
+            <li>目前支援商品頁上的商品名稱、圖片、價格、貨號與網址。</li>
+            <li>你建立的清單名稱、空間分類、商品數量與預設收件 Email。</li>
+            <li>上述資料只儲存在這個 Chrome 瀏覽器的本機空間，不會傳送到 RoomList 或開發者的伺服器，也不會用於廣告或販售。</li>
+            <li>只有你主動按下 Email 寄送時，內容才會交給你電腦上的預設郵件程式。</li>
+          </ul>
+          <button class="privacy-link" id="btnPrivacyPolicy" type="button">閱讀完整隱私權政策</button>
+          <div class="modal-actions">
+            <button class="btn btn-outline" id="btnDeclinePrivacy" style="flex:1">暫不啟用</button>
+            <button class="btn btn-primary" id="btnAcceptPrivacy" style="flex:1;height:44px;font-size:13px;margin-bottom:0">同意並啟用</button>
+          </div>
+        </div>
+      </div>
       <div class="modal-scrim" id="restoreScrim">
         <div class="modal">
           <h3>從備份還原</h3>
@@ -391,6 +410,7 @@
       totalValue: shadow.getElementById("totalValue"),
       toastRegion: shadow.getElementById("toastRegion"),
       settingsScrim: shadow.getElementById("settingsScrim"),
+      privacyScrim: shadow.getElementById("privacyScrim"),
       settingsListName: shadow.getElementById("settingsListName"),
       settingsEmail: shadow.getElementById("settingsEmail"),
       settingsEnabledToggle: shadow.getElementById("settingsEnabledToggle"),
@@ -479,6 +499,9 @@
     els.btnBulkDelete.addEventListener("click", onBulkDelete);
 
     shadow.getElementById("btnSettings").addEventListener("click", openSettings);
+    shadow.getElementById("btnPrivacyPolicy").addEventListener("click", openPrivacyPolicy);
+    shadow.getElementById("btnAcceptPrivacy").addEventListener("click", acceptPrivacy);
+    shadow.getElementById("btnDeclinePrivacy").addEventListener("click", declinePrivacy);
     shadow.getElementById("btnCancelSettings").addEventListener("click", closeSettings);
     shadow.getElementById("btnSaveSettings").addEventListener("click", saveSettings);
     shadow.getElementById("btnAddRoom").addEventListener("click", addRoomFromInput);
@@ -512,6 +535,28 @@
     els.drawer.classList.remove("open");
     els.scrim.classList.remove("show");
     els.tab.classList.remove("open");
+  }
+
+  function openPrivacyPolicy() {
+    chrome.runtime.sendMessage({ type: "OPEN_PRIVACY_POLICY" });
+  }
+
+  async function acceptPrivacy() {
+    await storage.setSettings({
+      privacyAcceptedAt: new Date().toISOString(),
+      privacyDecision: "",
+      extensionEnabled: true
+    });
+    els.privacyScrim.classList.remove("show");
+    // 重新載入後才開始擷取目前商品頁，確保同意前完全不處理網站內容。
+    location.reload();
+  }
+
+  async function declinePrivacy() {
+    await storage.setSettings({ privacyAcceptedAt: "", privacyDecision: "declined", extensionEnabled: false });
+    els.privacyScrim.classList.remove("show");
+    els.tab.style.display = "none";
+    closeDrawer();
   }
 
   // 修好擷取邏輯之前加進來的舊項目，名稱可能還留著「| IKEA 線上購物」這類網站字樣尾巴，
@@ -553,7 +598,16 @@
   }
 
   async function refresh() {
-    let [items, settings] = await Promise.all([storage.getItems(), storage.getSettings()]);
+    let settings = await storage.getSettings();
+    if (!settings.privacyAcceptedAt) {
+      state.items = [];
+      state.settings = settings;
+      state.rooms = settings.rooms;
+      els.tab.style.display = "none";
+      if (settings.privacyDecision !== "declined") els.privacyScrim.classList.add("show");
+      return;
+    }
+    let items = await storage.getItems();
     items = await cleanupLegacyNames(items);
     settings = await cleanupOtherRoomRename(items, settings);
     state.items = items;
@@ -1248,7 +1302,13 @@
   // ---- 供 content-script.js 呼叫的公開 API ----
   global.__roomlistPanel = {
     mount: mountPanel,
-    toggle: () => (els.drawer.classList.contains("open") ? closeDrawer() : openDrawer()),
+    toggle: () => {
+      if (!state.settings.privacyAcceptedAt) {
+        els.privacyScrim.classList.add("show");
+        return;
+      }
+      els.drawer.classList.contains("open") ? closeDrawer() : openDrawer();
+    },
     open: openDrawer,
     /**
      * 官網原生愛心按鈕被攔截點擊後呼叫這裡：在按鈕旁邊開一個「選空間」彈窗，

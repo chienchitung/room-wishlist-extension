@@ -4,11 +4,8 @@
  * 以 chrome.storage.local 存放收藏清單與設定，完全不需要登入 IKEA 帳號，
  * 只跟這個瀏覽器 profile 綁定。資料結構：
  *   items:    [{ id, name, price, qty, room, articleNo, url, image, addedAt }]
- *   settings: { defaultEmail, rooms: string[], extensionEnabled: boolean }
- *
- * TW／HK 清單各自獨立：items 存在依市場命名的兩把 key（ikeaWishlist_items_TW／_HK），
- * 在 ikea.com.tw 加的商品不會出現在 ikea.com.hk 的清單裡，反之亦然。設定（收件信箱／
- * 空間分類／擴充功能開關）維持共用一份，不分市場。
+ *   settings: { defaultEmail, rooms: string[], extensionEnabled: boolean, privacyAcceptedAt: string }
+ * 所有支援網站共用一份 roomList_items 清單。
  */
 (function (global) {
   "use strict";
@@ -52,17 +49,23 @@
     await chrome.storage.local.set({ [MIGRATED_FLAG_KEY]: true });
     await chrome.storage.local.remove(LEGACY_ITEMS_KEY);
   }
-  const migrationDone = migrateLegacyItemsOnce();
+  // 不在 content script 載入時立刻讀取舊清單。首次使用者先看完隱私揭露並同意，
+  // 真正需要清單資料時才執行遷移與讀取。
+  let migrationDone;
+  function ensureMigration() {
+    if (!migrationDone) migrationDone = migrateLegacyItemsOnce();
+    return migrationDone;
+  }
 
   async function getItems() {
-    await migrationDone;
+    await ensureMigration();
     const key = itemsKey();
     const r = await chrome.storage.local.get(key);
     return r[key] || [];
   }
 
   async function setItems(items) {
-    await migrationDone;
+    await ensureMigration();
     return chrome.storage.local.set({ [itemsKey()]: items });
   }
 
@@ -75,7 +78,9 @@
         defaultEmail: s.defaultEmail || "",
         rooms: Array.isArray(s.rooms) && s.rooms.length ? s.rooms : DEFAULT_ROOMS.slice(),
         extensionEnabled: s.extensionEnabled !== false,
-        listName: s.listName || DEFAULT_LIST_NAME
+        listName: s.listName || DEFAULT_LIST_NAME,
+        privacyAcceptedAt: typeof s.privacyAcceptedAt === "string" ? s.privacyAcceptedAt : "",
+        privacyDecision: s.privacyDecision === "declined" ? "declined" : ""
       };
     });
   }

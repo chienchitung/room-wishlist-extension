@@ -23,22 +23,6 @@
     "service_worker": "background/service-worker.js"
   },
   "permissions": ["storage"],
-  "host_permissions": [
-    "https://www.ikea.com.tw/*",
-    "https://www.ikea.com.hk/*",
-    "https://planner.ikea.com.tw/*",
-    "https://planner.ikea.com.hk/*",
-    "https://24h.pchome.com.tw/*",
-    "https://www.momoshop.com.tw/*",
-    "https://shopee.tw/*",
-    "https://www.tw.coupang.com/*",
-    "https://www.nitori-net.tw/*",
-    "https://www.trplus.com.tw/*",
-    "https://detail.tmall.com/*",
-    "https://item.taobao.com/*",
-    "https://www.hoihome.tw/*",
-    "https://www.mrliving.com.tw/*"
-  ],
   "content_scripts": [
     {
       "matches": [
