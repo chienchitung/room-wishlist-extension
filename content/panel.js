@@ -1127,6 +1127,7 @@
       .forEach((room) => {
         const list = state.items.filter((i) => i.room === room);
         body += `<h2>${escapeHtml(room)}　<small>小計 ${fmt(roomTotal(room))}</small></h2><table>
+          <colgroup><col class="col-name"><col class="col-source"><col class="col-articleno"><col class="col-num"><col class="col-num"><col class="col-num"></colgroup>
           <thead><tr><th>商品</th><th>來源</th><th>貨號</th><th>單價</th><th>數量</th><th>小計</th></tr></thead><tbody>`;
         list.forEach((i) => {
           body += `<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.source || "-")}</td><td>${escapeHtml(i.articleNo || "-")}</td><td>${fmt(i.price)}</td><td>${i.qty}</td><td>${fmt(i.price * i.qty)}</td></tr>`;
@@ -1146,9 +1147,14 @@
         .meta{color:#767267;font-size:13px;margin:6px 0 24px;}
         h2{font-size:15px;color:#111111;border-bottom:2px solid #C6A668;padding-bottom:6px;margin-top:28px;}
         h2 small{color:#767267;font-weight:400;font-size:12px;float:right;}
-        table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
-        th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #E4DFD3;}
-        th{color:#767267;font-weight:600;}
+        table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;margin-top:8px;}
+        th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #E4DFD3;word-wrap:break-word;}
+        th{color:#767267;font-weight:600;white-space:nowrap;}
+        .col-name{width:32%;}
+        .col-source{width:14%;}
+        .col-articleno{width:17%;}
+        .col-num{width:12.33%;}
+        td:nth-child(4),td:nth-child(5),td:nth-child(6){white-space:nowrap;}
         .grand{margin-top:24px;text-align:right;font-size:18px;font-weight:700;color:#111111;border-top:2px solid #C6A668;padding-top:10px;}
         .backup-block{margin-top:32px;padding-top:14px;border-top:1px dashed #E4DFD3;}
         .backup-label{font-size:10px;color:#767267;margin-bottom:4px;}
